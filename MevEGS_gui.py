@@ -23,8 +23,8 @@ import pandas as pd
 import ctypes
 from tkinter import filedialog
 import customtkinter as ctk
-import MevEGS_gui_utils_v005 as utils
-import MevEGS_gui_utils_cluster_v005 as cluster
+import MevEGS_gui_utils as utils
+import MevEGS_gui_utils_cluster as cluster
 from Post_Processing import ptracks as pt
 import posixpath
 from CTkMenuBar import *  # import CTkMenuBar
