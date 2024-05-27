@@ -29,7 +29,8 @@ STRUCTURE:
                  - permanently contains .pegs4dat, mevegs.cpp (and entourage)
                  - temporarily will contain copied input and output files 
 
-'GUI Home' directory (can be located anywhere)
+'MevEGS_gui' directory (can be located anywhere)
+
            |     - contains MevEGS_gui.py, "MevEGS_gui_utils.py, "MevEGS_gui_utils_cluster.py, mevegs_app.ini (.ini shows up on program exit),
            |        local_job_submission.bat, local_job_retrieve.bat, cluster_perf_mon_htop.bat (these need to be updated to include FQDN (fully qualified domain names) 'username'@jericho-jobctrl.mevex.local)
            |     - temporarily will contain various GUI files
