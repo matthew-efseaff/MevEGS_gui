@@ -4,8 +4,6 @@ Wrapper for controlling the various inputs and outputs for MevEGS
 README for MevEGS app/gui/program - (added to github after v005 development wrapped up)
 
 '''
-Initial Notes:
-    This project has, along with the project structure, been hacked together with not enough thought... but it 'works'. 
 
 REQUIREMENTS:
 
