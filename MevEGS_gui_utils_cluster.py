@@ -55,8 +55,8 @@ def btn_submit_cluster_jobs_clicked(self):
     last_lines = f_.readlines()[-1]
     job_id = last_lines.split(' ')[-1].split('\n')[0]
     f_.close()
-    f1 = open(self.directory_ini + job_file_name, 'w')
-    f1.write('\n' + str(self.directory_file_egsinp) + '\n' + str(self.directory_file_msh) + '\n')
+    f1 = open(self.directory_ini + job_file_name, 'a')
+    f1.write(str(self.directory_file_egsinp) + '\n' + str(self.directory_file_msh) + '\n')
     f1.close()
     shutil.copy2(job_file_name, job_id + '.txt')
     os.remove(job_file_name)
@@ -81,10 +81,13 @@ def btn_retrieve_cluster_jobs_clicked(self):
     os.chdir(self.directory_project)
     command = 'local_job_retrieve.bat'
     process = subprocess.Popen(['cmd', '/c', command], stdout=subprocess.PIPE)  # , bufsize=1, universal_newlines=True)
-    while process.poll() is None:
+    if process.poll() is None:
         utils.write_to_console_log(self, 'Cluster:\t\tDownloading files from the cluster')
-        time.sleep(5)
-    time.sleep(1)
+        time.sleep(10)
+    while process.poll() is None:
+        # utils.write_to_console_log(self, 'Cluster:\t\tDownloading files from the cluster')
+        time.sleep(2)
+    # time.sleep(1)
     # delete file
     os.remove(self.directory_project + 'local_job_retrieve.bat')
     os.chdir(self.directory_ini)
