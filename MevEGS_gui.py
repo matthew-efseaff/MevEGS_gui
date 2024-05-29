@@ -30,11 +30,9 @@ import posixpath
 from CTkMenuBar import *  # import CTkMenuBar
 from CTkXYFrame import *
 
-
 # import matplotlib.pyplot as plt
 # import tkinter as tk
 # import numpy as np
-
 
 # --------------------------------------------------------------------------------------------
 
