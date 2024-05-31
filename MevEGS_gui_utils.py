@@ -176,13 +176,11 @@ class MshResults_io:
 
         # get node data and reshape
         # maybe doesn't need to be in this function
-        # print("Importing node data")
         write_to_console_log(self, "GMSH:\t\tImporting node data")
         node_tags, node_coordinates, _ = gmsh.model.mesh.getNodes()
         self.node_coordinates = reshape_2d(node_coordinates, 3)
 
     def output_views_2(self, avg_beam_current, length_units, export_choice, volumes_to_include_list):
-        # print('Calculating tet centroids')
         write_to_console_log(self, "GMSH:\t\tCalculating tet centroids")
         physical_group_name_to_save = [self.group_names[i - 1] for i in self.groups_to_save]
         view_names_to_save = [self.view_names[i - 1] for i in self.views_to_save]
@@ -206,12 +204,10 @@ class MshResults_io:
         for i, tet in enumerate(tets_to_save):
             line = "{}, {}, {}, {}".format(tet, self.xmean[i], self.ymean[i], self.zmean[i])
             # add selected data fields
-            # print('generating lines for csv')
+            write_to_console_log(self, "GMSH:\t\tGenerating lines for csv")
             for j in range(len(sub)):
                 line += ", {}".format(sub[j][int(tet - 1)])
             lines.append(line + '\n')
-
-        # print('Writing export csv')
         write_to_console_log(self, "GMSH:\t\tWriting export csv")
         # Make new directory for exports / parse values for allowed filename content
         directory_exports = self.directory + 'exports/'
@@ -244,7 +240,6 @@ class MshResults_io:
         elif length_units == 'm':
             length_unit_value = 0.01
         else:
-            # print('Error with MevEGS to GMSH unit conversion')
             write_to_console_log(self, "GMSH:\t\tError with MevEGS to GMSH unit conversion")
         # Save individual views and group exports
         vols_chosen_list_a = [x for xs in vols_chosen_list for x in xs]  # appends volumes to export file
@@ -1066,14 +1061,11 @@ def process_phase_space_files(self):
     time.sleep(5)
     for i in range(len(phsp_filenames)):
         while progress_phase[i].poll() is None:
-            # print('Working on combining phase-space files...')
             write_to_console_log(self, "MevEGS:\t\tWorking on combining phase-space files...")
             time.sleep(15)
     else:
-        # print('Combining jobs complete')
         write_to_console_log(self, "MevEGS:\t\tCombining jobs complete")
     time.sleep(1)
-    # print('Preparing human readable phase space files...')
     write_to_console_log(self, "MevEGS:\t\tPreparing human readable phase space files...")
 
     # Convert to human-readable, hardcoded beamdp option 11
@@ -1086,10 +1078,8 @@ def process_phase_space_files(self):
     time.sleep(5)
     for i in range(len(phsp_filenames)):
         while progress_read[i].poll() is None:
-            # print('Preparing human readable phase space files ', str(i + 1), '...')
             write_to_console_log(self, "MevEGS:\t\tPreparing human readable phase space files " + str(i + 1) + '...')
             time.sleep(10)
-    # print('Readable particle phase space files saved in: ', directory_project)
     write_to_console_log(self, "MevEGS:\t\tReadable particle phase space files saved in: " + directory_project)
     # delete beamdp.bat
     os.remove(directory_project + 'beamdp.bat')
@@ -1224,7 +1214,6 @@ def load_gmsh_data_for_figures(self, path_results_msh_file, path_directory_proje
 def one_d_generation_gmsh(self):
     checked_view_list = self.view_scroll_frame.get()
     if len(checked_view_list) > 1:
-        # print('Warning\t: Only one GMSH view can be checked')
         write_to_console_log(self, "MevEGS:\t\tOnly one GMSH view can be checked")
         return
     checked_view = ''.join(checked_view_list)
@@ -1758,7 +1747,8 @@ def create_hover_tooltips(self):
                                                                                  "completed jobs")
     self.btn_results_retrieve_2_tip = CTkToolTip(self.btn_results_retrieve_2, delay=0.1, message="Open directory " + self.directory_project)
     self.btn_process_phasespace_2_tip = CTkToolTip(self.btn_process_phasespace_2, delay=0.1, message="Uses beamdp.bat (option 11) to convert files to human-readable")
-    self.btn_load_gmshviews_3_tip = CTkToolTip(self.btn_load_gmshviews_3, delay=0.1, message="Button may not be necessary...")
+    self.lbl_results_header_3_tip = CTkToolTip(self.lbl_results_header_3, delay=0.1, message="Displays current .results.msh file")
+    self.btn_load_gmshviews_3_tip = CTkToolTip(self.btn_load_gmshviews_3, delay=0.1, message="Refresh list of views in current project")
     self.btn_generate_views_3_tip = CTkToolTip(self.btn_generate_views_3, delay=0.1, message="Opens window to create views not included above")
     self.btn_export_views_3_tip = CTkToolTip(self.btn_export_views_3, delay=0.1, message="Opens window to export data in .csv format")
     self.menu_data_3_tip = CTkToolTip(self.menu_data_3, delay=0.1, message="Contains exported .csv files\nassociated with this project")
@@ -1807,6 +1797,7 @@ def update_hover_tooltips(self):
     self.btn_retrieve_2_tip.configure(message="SSH to Jericho and retrieves ALL completed jobs")
     self.btn_results_retrieve_2_tip.configure(message="Open directory " + self.directory_project)
     self.btn_process_phasespace_2_tip.configure(message="Uses beamdp.bat (option 11) to convert files to human-readable")
+    self.lbl_results_header_3_tip.configure(message="Displays current .results.msh file")
     self.btn_load_gmshviews_3_tip.configure(message="Button may not be necessary...")
     self.btn_generate_views_3_tip.configure(message="Opens window to create views not included above")
     self.btn_export_views_3_tip.configure(message="Opens window to export data in .csv format")

@@ -942,8 +942,7 @@ class MevegsGui:
         self.njobs = saved_info_dict['numjobs']
         self.directory_file_project_msh = saved_info_dict['results']
         self.username = saved_info_dict['username']
-        self.menu_source = saved_info_dict['source']
-
+        self.menu_source = str(saved_info_dict['source'])
         self.gmsh_views = ''
         self.gmsh_groups = ''
         path_res_mesh = ' / '.join(os.path.dirname(self.directory_file_project_msh).split('/')[-2:])
@@ -952,7 +951,6 @@ class MevegsGui:
         self.load_proper_dirnames_from_dict(self.btn_mevegs_explore, self.directory_mevegs)
         self.load_proper_dirnames_from_dict(self.btn_postpro_explore, self.directory_post_pro)
         self.load_proper_dirnames_from_dict(self.btn_project_explore, self.directory_project)
-        self.load_proper_dirnames_from_dict(self.btn_mevegs_explore, self.directory_mevegs)
         self.load_proper_dirnames_from_dict(self.btn_cluster_explore, self.directory_ini)
         self.load_proper_filenames_from_dict(self.btn_egsinp_explore, self.directory_file_egsinp)
         self.load_proper_filenames_from_dict(self.btn_mesh_explore, self.directory_file_msh)
@@ -1056,10 +1054,10 @@ class MevegsGui:
             w.writerows(save_dict.items())
         self.gui.title('MevEGS - ' + file_)
         textbox_text = self.console_text_box_input.get('2.9', '2.22')  # grabs most recent quick_save output
-        if textbox_text == 'Project quick':  # doesn't print quick save note every time a tab is changed unless work ...
+        if textbox_text == 'Project saved':  # doesn't print save note every time a tab is changed unless work ...
             pass  # ...has happened in between
         else:
-            utils.write_to_console_log(self, 'MevEGS:\t\tProject quick-saved as: ' + file_ + '.save\nin ' +
+            utils.write_to_console_log(self, 'MevEGS:\t\tProject saved as: ' + file_ + '.save\nin ' +
                                    self.directory_project)
         self.gui.update_idletasks()
 
@@ -1302,7 +1300,7 @@ class MevegsGui:
             shutil.copy2(self.directory_ini + 'Source_Phasespace_Files/' + str(self.menu_source_1.get()),
                          self.directory_mevegs)
             utils.write_to_console_log(self, "MevEGS:\t\tPhase-space file included: " + str(self.menu_source_1.get()))
-            print('Phase-space file included: ' + str(self.menu_source_1.get()))
+            # print('Phase-space file included: ' + str(self.menu_source_1.get()))
         shutil.copy2(self.directory_file_msh, self.directory_mevegs)
         shutil.copy2(self.directory_file_egsinp, self.directory_mevegs)
         _, file_egsinp = os.path.split(self.directory_file_egsinp)
@@ -1314,14 +1312,14 @@ class MevegsGui:
         # if os.path.isfile(self.directory_mevegs + str(self.menu_source_1.get())):
         #     print(self.directory_mevegs + str(self.menu_source_1.get()))
         if os.path.isfile(self.directory_mevegs + str(self.menu_source_1.get())):
-            # print(self.directory_mevegs + str(self.menu_source_1.get()))
-            for ijob in range(1, int(numjobs) + 1):
-                command = 'mevegs -i ' + file_egsinp + ' -p ' + file_pegs + '  ' + file_msh + ' -b -P ' + str(
-                    numjobs) + ' -j ' + str(ijob) + ' -f 1'
-                # command1 = 'echo %PATH%'
-                job_file_name = 'mevegs_job_thread_' + str(ijob) + '.mvgs'
-                with open(job_file_name, "w") as f:
-                    process = subprocess.Popen(['cmd', '/c', command], stdout=f, stderr=subprocess.STDOUT, bufsize=0)
+            utils.write_to_console_log(self, "MevEGS:\t\t Phase-space source - " + str(self.menu_source_1.get()))
+        for ijob in range(1, int(numjobs) + 1):
+            command = 'mevegs -i ' + file_egsinp + ' -p ' + file_pegs + '  ' + file_msh + ' -b -P ' + str(
+                numjobs) + ' -j ' + str(ijob) + ' -f 1'
+            # command1 = 'echo %PATH%'
+            job_file_name = 'mevegs_job_thread_' + str(ijob) + '.mvgs'
+            with open(job_file_name, "w") as f:
+                process = subprocess.Popen(['cmd', '/c', command], stdout=f, stderr=subprocess.STDOUT, bufsize=0)
         utils.write_to_console_log(self, "MevEGS:\t\tSimulation started")
         os.chdir(self.directory_ini)
 
@@ -1497,7 +1495,8 @@ class MevegsGui:
                 if os.path.isfile(object_):
                     shutil.copy2(object_, self.directory_project + 'phase_space_files/')
                     os.remove(object_)
-        utils.write_to_console_log(self, 'MevEGS:\t\tFiles moved from MevEGS HOME to Project Directory')
+        utils.write_to_console_log(self, 'MevEGS:\t\tFiles moved from MevEGS HOME to Project Directory\n'
+                                         '\t\t\t' + self.directory_project)
         if os.path.isfile(self.directory_mevegs + str(self.menu_source_1.get())):
             os.remove(str(self.menu_source_1.get()))
         # Process phase space files  //  only matches to parallel runs with at least 2 _w files
@@ -1515,7 +1514,12 @@ class MevegsGui:
         self.btn_results_mesh_explore.configure(text='.'.join(os.path.basename(self.directory_file_project_msh).split('.')[:-2]))
         self.directory_file_egsinp = self.directory_project + file_egsinp
         self.btn_egsinp_explore.configure(text='.'.join(os.path.basename(self.directory_file_egsinp).split('.')[:-1]))
-        # SAME FOR MESH FILE
+        self.directory_file_msh = self.directory_project + file_msh
+        self.btn_mesh_explore.configure(text='.'.join(os.path.basename(self.directory_file_msh).split('.')[:-1]))
+        # QUICKSAVE
+        os.chdir(self.directory_project)
+        self.quick_save()
+        utils.update_hover_tooltips(self)
         self.gui.update_idletasks()
         os.chdir(self.directory_ini)
 
