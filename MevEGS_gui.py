@@ -106,6 +106,7 @@ class MevegsGui:
         self.menu_bar = CTkMenuBar(self.gui)
         self.menu_bar_file = self.menu_bar.add_cascade(text="File")
         self.menu_bar_settings = self.menu_bar.add_cascade(text='Settings')
+        self.menu_bar_relaunch = self.menu_bar.add_cascade(text='Relaunch app')
 
         self.drop_menu_file = CustomDropdownMenu(widget=self.menu_bar_file)
         self.drop_menu_file.add_option(option='Quick Save', command=lambda: self.quick_save())
@@ -114,7 +115,7 @@ class MevegsGui:
         self.drop_menu_file.add_option(option='New Project', command=lambda: [utils.save_project(self)])
         self.drop_menu_file.add_separator()
         self.drop_menu_file.add_option(option='Exit', command=lambda: self.btn_exit_program())
-        self.drop_menu_file.add_option(option='Destroy Program (development)', command=lambda: self.btn_emergency_destroy())
+        self.drop_menu_file.add_option(option='Force Exit', command=lambda: self.btn_emergency_destroy())
 
         self.drop_menu_settings = CustomDropdownMenu(widget=self.menu_bar_settings)
         self.drop_menu_settings.add_option(option='Full Screen (toggle)',
@@ -167,6 +168,9 @@ class MevegsGui:
                                                                              utils.color_theme_notice(self)])
         self.sub_drop_theme.add_option(option="TrojanBlue", command=lambda: [ctk.set_default_color_theme("TrojanBlue"),
                                                                              utils.color_theme_notice(self)])
+        self.drop_menu_relaunch = CustomDropdownMenu(widget=self.menu_bar_relaunch)
+        self.drop_menu_relaunch.add_option(option='Relaunch app', command=lambda: utils.restart_app_now(self))
+
 
         self.tabview = ctk.CTkTabview(master=gui, anchor='nw', command=self.btn_update_tabs)
         self.tabview.pack()
@@ -969,11 +973,8 @@ class MevegsGui:
         if os.path.isfile(self.directory_file_project_msh):
             utils.load_gmsh_data_for_figures(self, self.directory_file_project_msh,
                                              self.directory_project, self.directory_file_egsinp)
-        # try:
-        #     utils.load_gmsh_data_for_figures(self, self.directory_file_project_msh,
-        #                                  self.directory_project, self.directory_file_egsinp)
-        # except:
-        #     pass
+        self.btn_results_retrieve_2.configure(text='Open directory\n' +
+                                                         os.path.basename(os.path.dirname(self.directory_project)))
         self.menu_source_1.set(self.menu_source)
         utils.update_hover_tooltips(self)
         utils.update_phasespace_warning_label(self)
@@ -1053,7 +1054,7 @@ class MevegsGui:
             w = csv.writer(myfile)
             w.writerows(save_dict.items())
         self.gui.title('MevEGS - ' + file_)
-        textbox_text = self.console_text_box_input.get('2.9', '2.22')  # grabs most recent quick_save output
+        textbox_text = self.console_text_box_input.get('2.20', '2.33')  # grabs most recent quick_save output
         if textbox_text == 'Project saved':  # doesn't print save note every time a tab is changed unless work ...
             pass  # ...has happened in between
         else:

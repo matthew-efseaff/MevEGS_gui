@@ -103,59 +103,36 @@ def btn_retrieve_cluster_jobs_clicked(self):
 def process_cluster_phase_space(self):
     os.makedirs(self.directory_project + 'phase_space_files/', exist_ok=True)
     directory_project = self.directory_project + 'phase_space_files/'
-    items_phase_space = glob.glob(self.directory_project + '*.egsphsp1', recursive=False)
-    for i in items_phase_space:
-        os.replace(i, directory_project + os.path.basename(i))
     phsp_filenames = []
-    for fname in os.listdir(directory_project):  # gets list of filenames
+    for fname in os.listdir(self.directory_project):  # gets list of filenames
         if '.egsphsp1' in fname:
             phsp_filenames.append(os.path.basename(fname).split('.egsphsp1')[0])
-    # Convert to human-readable, hardcoded beamdp option 11
-    # move beamdp.bat to working dir
+    print(phsp_filenames)
+    egsphsp1_file_names = glob.glob(self.directory_project + '*egsphsp1', recursive=False)
+    print(egsphsp1_file_names)
+    for object_ in egsphsp1_file_names:
+        if os.path.isfile(object_):
+            shutil.copy2(object_, directory_project)
     shutil.copy2(self.directory_post_pro + 'beamdp.bat', directory_project)
-    time.sleep(5)
-    os.chdir(directory_project)  # navigate to beamdp.bat new 'home' temporarily
-    print(os.getcwd())
+    if os.path.isfile(directory_project + 'beamdp.bat'):
+        print(directory_project + 'beamdp.bat')
+    else:
+        print('no beamdp.bat in directory')
     progress_read = []
-    if os.path.isfile(directory_project + 'beamdp.bat') and os.path.isfile(directory_project + phsp_filenames[0] + '.egsphsp1'):
-        for j in range(len(phsp_filenames)):
-            print(directory_project + 'beamdp.bat', directory_project + phsp_filenames[j] + '.egsphsp1')
-            # command2 = 'echo %PATH%'
-            # command1 = "set PATH=%PATH%"  #;C:/Mevegs_local/HEN_HOUSE/bin/win3264/"
-            command2 = "beamdp.bat " + phsp_filenames[j] + ".egsphsp1"
-            # command1 = "set PATH=%PATH%;C:/Mevegs_local/HEN_HOUSE/bin/win3264/"  # ;' + 'cmd /c beamdp.bat ' + phsp_filenames[j] + '.egsphsp1'
-            # directory_project + 'beamdp.bat', phsp_filenames[j] + ".egsphsp1"
-            # python_ = subprocess.run(["cmd", '/c', 'echo %PATH%'])
-            # print(command)
-            # print(os.environ)
-            # subprocess.Popen(['cmd', '/k', command1])
-            progress_read.append(subprocess.Popen(['cmd', '/c', command2]))  # 'cmd', '/c',
-            # command2 = "set PATH=%PATH%;C:/Mevegs_local/HEN_HOUSE/bin/win3264/&& echo %PATH%&& beamdp.bat " + phsp_filenames[j] + ".egsphsp1"
-            # progress_read.append(subprocess.Popen([command1], shell=True))
-            # command2 = "set PATH=%PATH%;C:/Mevegs_local/HEN_HOUSE/bin/win3264/&& echo %PATH%"
-            # progress_read.append(subprocess.Popen(['cmd', '/V', '/c', com]))
-            # progress_read.append(subprocess.Popen(['cmd', '/c', command1], env=dict(os.environ, PATH="path")))
-            print(progress_read[j].args)
-            # cmd2 = str(
-            #     'ssh ' + username + '@192.168.105.105 \"cd electron-gamma-shower/egs_home/mevegs; ./cleanup.sh; \\rm *.egsinp; \\rm *.msh\"')  # @jericho-jobctrl.mevex.local
-            # subprocess.Popen(cmd2)
+    os.chdir(directory_project)
+    print(os.getcwd())
+    for j in range(len(phsp_filenames)):
+        command = 'beamdp.bat ' + phsp_filenames[j] + '.egsphsp1'
+        print(command)
+        progress_read.append(subprocess.Popen(['cmd', '/c', command]))
     time.sleep(5)
     for i in range(len(phsp_filenames)):
         while progress_read[i].poll() is None:
-            utils.write_to_console_log(self, 'MevEGS:\t\tPreparing human readable phase space files ' + str(i + 1) + '...')
-            # print('Preparing human readable phase space files ', str(i + 1), '...')
+            utils.write_to_console_log(self, "MevEGS:\t\tPreparing human readable phase space files " + str(i + 1) + '...')
             time.sleep(10)
-    utils.write_to_console_log(self, 'MevEGS:\t\tReadable particle phase space files saved in:\n' + directory_project)
-    # delete beamdp.bat
+    utils.write_to_console_log(self, "MevEGS:\t\tReadable particle phase space files saved in: " + directory_project)
     # os.remove(directory_project + 'beamdp.bat')
-    # for i in range(len(phsp_filenames)):
-    #     if os.path.isfile(directory_project + phsp_filenames[i] + '.egsphsp1'):
-    #         shutil.move(directory_project + phsp_filenames[i] + '.egsphsp1', self.directory_project)
-    # items_egsphsp1 = glob.glob(directory_project + '*.egsphsp1', recursive=False)
-    # for object_ in items_egsphsp1:
-    #     if os.path.isfile(object_):
-    #         os.remove(object_)  # Don't need .egsphsp1 files anymore - memory/storage savings
-    # os.chdir(self.directory_mevegs)  # back to mevegs home
+    os.chdir(self.directory_mevegs)  # back to mevegs home
 
 
 def btn_kill_cluster_jobs_clicked(self, username, job_id):

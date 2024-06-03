@@ -204,7 +204,7 @@ class MshResults_io:
         for i, tet in enumerate(tets_to_save):
             line = "{}, {}, {}, {}".format(tet, self.xmean[i], self.ymean[i], self.zmean[i])
             # add selected data fields
-            write_to_console_log(self, "GMSH:\t\tGenerating lines for csv")
+            # write_to_console_log(self, "GMSH:\t\tGenerating lines for csv")  # far too many outputs to console
             for j in range(len(sub)):
                 line += ", {}".format(sub[j][int(tet - 1)])
             lines.append(line + '\n')
@@ -1062,14 +1062,18 @@ def process_phase_space_files(self):
     for i in range(len(phsp_filenames)):
         while progress_phase[i].poll() is None:
             write_to_console_log(self, "MevEGS:\t\tWorking on combining phase-space files...")
-            time.sleep(15)
+            time.sleep(10)
     else:
         write_to_console_log(self, "MevEGS:\t\tCombining jobs complete")
     time.sleep(1)
-    write_to_console_log(self, "MevEGS:\t\tPreparing human readable phase space files...")
+    process_human_phase_space_files(self, phsp_filenames)
 
+
+def process_human_phase_space_files(self, phsp_filenames):
+    write_to_console_log(self, "MevEGS:\t\tPreparing human readable phase space files...")
     # Convert to human-readable, hardcoded beamdp option 11
     # move beamdp.bat to working dir
+    directory_project = self.directory_project + 'phase_space_files/'
     shutil.copy2(self.directory_post_pro + 'beamdp.bat', directory_project)
     progress_read = []
     for j in range(len(phsp_filenames)):
@@ -1083,8 +1087,12 @@ def process_phase_space_files(self):
     write_to_console_log(self, "MevEGS:\t\tReadable particle phase space files saved in: " + directory_project)
     # delete beamdp.bat
     os.remove(directory_project + 'beamdp.bat')
-    items_egsphsp1 = glob.glob(directory_project + '*.egsphsp1', recursive=False)
+    items_egsphsp1 = glob.glob(directory_project + '*_w[1-9].egsphsp1', recursive=False)  # _w[1-9].egsphsp1 files
     for object_ in items_egsphsp1:
+        if os.path.isfile(object_):
+            os.remove(object_)  # junk files
+    items_egsphsp2 = glob.glob(directory_project + '*_w[1-9][0-9].egsphsp1', recursive=False)  # _w[1-9][0-9].egsphsp1 files
+    for object_ in items_egsphsp2:
         if os.path.isfile(object_):
             os.remove(object_)  # junk files
     os.chdir(self.directory_mevegs)  # back to mevegs home
@@ -1689,6 +1697,9 @@ def restore_defaults(self):
     return self.directory_file_egsinp, self.directory_file_msh, self.directory_project, self.directory_file_project_msh
 
 def create_hover_tooltips(self):
+    # Menu Bar
+    self.drop_menu_relaunch_tip = CTkToolTip(self.drop_menu_relaunch, delay=0.1,
+                                             message="Relaunches app after error (will quick-save inputs)")  # doesn't seem to work
     # Input Tab
     self.btn_project_explore_tip = CTkToolTip(self.btn_project_explore, delay=0.1, message=self.directory_project + '\n'
                                                                                             'One simulation per project folder\n'
@@ -1758,6 +1769,8 @@ def create_hover_tooltips(self):
     self.btn_create_2d_tip = CTkToolTip(self.btn_create_2d, delay=0.1, message="Opens window to define plane geometry\nthrough chosen GMSH view")
 
 def update_hover_tooltips(self):
+    # Menu Bar
+    self.drop_menu_relaunch_tip.configure(message="Relaunches app after error (will quick-save inputs)")  # doesn't seem to work
     # Input Tab
     self.btn_project_explore_tip.configure(message=self.directory_project + '\nOne simulation per project folder\n'
                                                                             'A main project folder can have many subfolders')
