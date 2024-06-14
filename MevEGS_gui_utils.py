@@ -89,7 +89,7 @@ def tetsInPhysicalGroup(dim, tag, export_choice, volumes_list_i, volumes_chosen_
         tets = tets + list(tets_in_entity)  # append tet numbers
         nodes = nodes + list(
             nodes_in_entity)  # append node numbers -> note that this is returned flattened len(dim(tets)*4)
-    return tets, reshape_2d(nodes, 4), volumes_chosen_list
+    return tets, nodes, volumes_chosen_list
 
 
 def calc_tet_centroid(tet_tags, node_tags, node_coordinates):
@@ -97,6 +97,7 @@ def calc_tet_centroid(tet_tags, node_tags, node_coordinates):
     xmean = [0 for x in range(num_elements)]
     ymean = [0 for x in range(num_elements)]
     zmean = [0 for x in range(num_elements)]
+    nodes = []
     for i in range(num_elements):
         node1 = int(node_tags[i][0] - 1)  # -1 because gmsh indexes from 1, we index from 0
         node2 = int(node_tags[i][1] - 1)
@@ -178,6 +179,7 @@ class MshResults_io:
         # maybe doesn't need to be in this function
         write_to_console_log(self, "GMSH:\t\tImporting node data")
         node_tags, node_coordinates, _ = gmsh.model.mesh.getNodes()
+        # print(node_coordinates[:50])
         self.node_coordinates = reshape_2d(node_coordinates, 3)
 
     def output_views_2(self, avg_beam_current, length_units, export_choice, volumes_to_include_list):
@@ -186,11 +188,14 @@ class MshResults_io:
         view_names_to_save = [self.view_names[i - 1] for i in self.views_to_save]
         tets_to_save = []
         nodes_to_save = []
+        tets_to_save_append = []
+        nodes_to_save_append = []
         lines = []
         volumes_chosen_list = []
         for i, group in enumerate(self.groups_to_save):
-            new_tets, new_nodes, vols_chosen_list = tetsInPhysicalGroup(3, group, export_choice,
+            new_tets, nodes, vols_chosen_list = tetsInPhysicalGroup(3, group, export_choice,
                                                                         volumes_to_include_list[i], volumes_chosen_list)
+            new_nodes = reshape_2d(nodes, 4)
             tets_to_save += new_tets
             nodes_to_save += new_nodes
         [self.xmean, self.ymean, self.zmean] = calc_tet_centroid(tets_to_save, nodes_to_save, self.node_coordinates)
@@ -202,9 +207,9 @@ class MshResults_io:
 
         # generate lines for csv file, list of strings
         for i, tet in enumerate(tets_to_save):
+            # print('\t', i, tet)
             line = "{}, {}, {}, {}".format(tet, self.xmean[i], self.ymean[i], self.zmean[i])
             # add selected data fields
-            # write_to_console_log(self, "GMSH:\t\tGenerating lines for csv")  # far too many outputs to console
             for j in range(len(sub)):
                 line += ", {}".format(sub[j][int(tet - 1)])
             lines.append(line + '\n')
@@ -247,7 +252,7 @@ class MshResults_io:
         group_list = []
         for name in view_names_to_save:
             df = pd.read_csv(directory_exports + result_file,
-                             usecols=[' x-coordinate', ' y-coordinate', ' z-coordinate', ' ' + name], sep=',')
+                             usecols=['tet', ' x-coordinate', ' y-coordinate', ' z-coordinate', ' ' + name], sep=',')
             df[' x-coordinate'] *= length_unit_value / scaling_factor
             df[' y-coordinate'] *= length_unit_value / scaling_factor
             df[' z-coordinate'] *= length_unit_value / scaling_factor
@@ -277,14 +282,6 @@ class MshResults_io:
                 name = 'PD_Wcm3_avg-beam_' + str(avg_beam_current) + 'mA'
             name = name.replace(" ", "_")
             name_units = '_units-' + length_units
-            # if os.path.isfile(directory_exports + name + name_units + '_' + group_string + vols_chosen_list_b + '.csv'):
-            #     write_to_console_log(self,
-            #      "GMSH:\t\tThis data selection has been exported before\nSee Python console for instructions -->")
-            #     appendage = input('Enter specific file identifier (e.g. volume numbers chosen) and Enter, or hit Enter to overwrite: ')
-            #     df.to_csv(
-            #         directory_exports + name + name_units + '_' + group_string + vols_chosen_list_b + appendage + '.csv',
-            #         index=False, header=False)
-            # else:
             df.to_csv(directory_exports + name + name_units + '_' + group_string + vols_chosen_list_b + '.csv',
                       index=False, header=False)
             group_list = []
@@ -1497,6 +1494,7 @@ def two_d_generate_gmsh_figure(self, msh_data, view_tag, x0, y0, z0, x1, y1, z1,
     if np.abs(pd_plane['X'].max() - pd_plane['X'].min()) and np.abs(
             pd_plane['Y'].max() - pd_plane['Y'].min()) >= np.abs(
             pd_plane['Z'].max() - pd_plane['Z'].min()):
+        print('Plotting: xyz')
         range_x = np.arange(pd_plane['X'].min(), pd_plane['X'].max(),
                             (pd_plane['X'].max() - pd_plane['X'].min()) / int(numpointsu))
         range_y = np.arange(pd_plane['Y'].min(), pd_plane['Y'].max(),
@@ -1522,6 +1520,7 @@ def two_d_generate_gmsh_figure(self, msh_data, view_tag, x0, y0, z0, x1, y1, z1,
     elif np.abs(pd_plane['X'].max() - pd_plane['X'].min()) and np.abs(
             pd_plane['Z'].max() - pd_plane['Z'].min()) >= np.abs(
             pd_plane['Y'].max() - pd_plane['Y'].min()):
+        print('Plotting: xzy')
         range_x = np.arange(pd_plane['X'].min(), pd_plane['X'].max(),
                             (pd_plane['X'].max() - pd_plane['X'].min()) / int(numpointsu))
         range_y = np.arange(pd_plane['Z'].min(), pd_plane['Z'].max(),
@@ -1545,6 +1544,7 @@ def two_d_generate_gmsh_figure(self, msh_data, view_tag, x0, y0, z0, x1, y1, z1,
         ax1.set_ylabel('Projection V')
         ax1.set_xlim(np.max(x_surf + dx_surf / 2), np.min(x_surf + dx_surf / 2))
     else:
+        print('Plotting: yzx')
         range_x = np.arange(pd_plane['Y'].min(), pd_plane['Y'].max(),
                             (pd_plane['Y'].max() - pd_plane['Y'].min()) / int(numpointsu))
         range_y = np.arange(pd_plane['Z'].min(), pd_plane['Z'].max(),
@@ -1698,8 +1698,8 @@ def restore_defaults(self):
 
 def create_hover_tooltips(self):
     # Menu Bar
-    self.drop_menu_relaunch_tip = CTkToolTip(self.drop_menu_relaunch, delay=0.1,
-                                             message="Relaunches app after error (will quick-save inputs)")  # doesn't seem to work
+    self.drop_menu_relaunch_tip = CTkToolTip(self.menu_bar_relaunch, delay=0.1,
+                                             message="Relaunches app after error (will quick-save inputs)")
     # Input Tab
     self.btn_project_explore_tip = CTkToolTip(self.btn_project_explore, delay=0.1, message=self.directory_project + '\n'
                                                                                             'One simulation per project folder\n'
@@ -1770,7 +1770,7 @@ def create_hover_tooltips(self):
 
 def update_hover_tooltips(self):
     # Menu Bar
-    self.drop_menu_relaunch_tip.configure(message="Relaunches app after error (will quick-save inputs)")  # doesn't seem to work
+    self.drop_menu_relaunch_tip.configure(message="Relaunches app after error (will quick-save inputs)")
     # Input Tab
     self.btn_project_explore_tip.configure(message=self.directory_project + '\nOne simulation per project folder\n'
                                                                             'A main project folder can have many subfolders')
@@ -1823,10 +1823,10 @@ def update_hover_tooltips(self):
 def update_phasespace_warning_label(self):
     self.phasespace_warning_2.configure(text='\'Retrieve all\' downloads all available\n'
                                              'simulations to sub-folders of your\n'
-                                             'project to four digit folder names\n   /'
+                                             'project with four digit folder names\n   /'
                                              + os.path.basename(os.path.dirname(self.directory_project)) + '/####/\n'
-                                               'You must change the \'.results.msh\'\n'
-                                               '(directory path)\' in the \n'
+                                               'You must change the \"Project folder\"\n'
+                                               '(directory path) in the \n'
                                                '\'Source Files\' tab to the\n'
                                                'correct directory before processing\n'
                                                'phase-space files and using the\n'

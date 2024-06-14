@@ -30,7 +30,7 @@ def btn_submit_cluster_jobs_clicked(self):
         process = subprocess.Popen(['cmd', '/c', command], stdout=f, stderr=subprocess.STDOUT, bufsize=0)
     while process.poll() is None:
         utils.write_to_console_log(self, 'MevEGS:\t\tSending job to cluster')
-        time.sleep(2)
+        time.sleep(5)
     # launch performance monitor
     # if os.path.isfile(self.directory_ini + 'cluster_perf_mon_htop.bat'):
     #     subprocess.Popen(['cmd', '/c', 'cluster_perf_mon_htop.bat'])

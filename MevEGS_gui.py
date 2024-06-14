@@ -168,9 +168,7 @@ class MevegsGui:
                                                                              utils.color_theme_notice(self)])
         self.sub_drop_theme.add_option(option="TrojanBlue", command=lambda: [ctk.set_default_color_theme("TrojanBlue"),
                                                                              utils.color_theme_notice(self)])
-        self.drop_menu_relaunch = CustomDropdownMenu(widget=self.menu_bar_relaunch)
-        self.drop_menu_relaunch.add_option(option='Relaunch app', command=lambda: utils.restart_app_now(self))
-
+        self.menu_bar_relaunch.configure(command=lambda: utils.restart_app_now(self))
 
         self.tabview = ctk.CTkTabview(master=gui, anchor='nw', command=self.btn_update_tabs)
         self.tabview.pack()
@@ -424,9 +422,6 @@ class MevegsGui:
                                                               cluster.btn_display_cluster_status_clicked_2(self,
                                                                                                            self.optionmenu_user_2.get())])
         self.btn_display_cluster_status_2.grid(column=0, row=8, padx=5, pady=2, sticky='we')
-        self.btn_show_job_list_2 = ctk.CTkButton(self.frame_2, text='Jobs still on cluster', anchor='center',
-                                                 command=lambda: cluster.btn_show_job_list_clicked_2(self))
-        self.btn_show_job_list_2.grid(column=0, row=9, padx=5, pady=2, sticky='we')
 
         # COLUMN 1
         # Cluster interaction
@@ -434,8 +429,9 @@ class MevegsGui:
         self.lbl_header_21 = ctk.CTkLabel(self.frame_2, text="Simulation Cleanup", font=('Helvetica', 16, 'bold'),
                                           fg_color=("grey90", "gray10"), text_color=['black', 'white'], corner_radius=6)
         self.lbl_header_21.grid(column=1, row=0, padx=5, pady=2, sticky='we')
-        self.lbl_list_jobs_2 = ctk.CTkLabel(self.frame_2, text='Choose job to kill')
-        self.lbl_list_jobs_2.grid(column=1, row=1, padx=10, pady=2, sticky='we')
+        self.btn_show_job_list_2 = ctk.CTkButton(self.frame_2, text='Jobs still on cluster', anchor='center',
+                                                 command=lambda: cluster.btn_show_job_list_clicked_2(self))
+        self.btn_show_job_list_2.grid(column=1, row=1, padx=5, pady=2, sticky='we')
         self.optionmenu_job_2 = ctk.CTkComboBox(self.frame_2, values=['Job number'], justify='center')
         self.optionmenu_job_2.grid(column=1, row=2, padx=5, pady=2, sticky='we')
         self.optionmenu_job_2['state'] = 'normal'
@@ -462,8 +458,8 @@ class MevegsGui:
                                                       'simulations to sub-folders of your\n'
                                                       'project with four digit folder names:\n   /'
                                                       + os.path.basename(os.path.dirname(self.directory_project)) + '/####/\n'
-                                                      'You must change the \'.results.msh\'\n'
-                                                      '(directory path)\' in the \n'
+                                                      'You must change the \"Project folder\"\n'
+                                                      '(directory path) in the \n'
                                                       '\'Source Files\' tab to the\n'
                                                       'correct directory before processing\n'
                                                       'phase-space files and using the\n'
