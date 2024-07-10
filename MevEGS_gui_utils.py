@@ -1835,7 +1835,7 @@ def update_phasespace_warning_label(self):
 def one_d_generation_export(self):
     file_name = self.menu_data_3.get()
     data_type = file_name.split('_')[0]
-    dataframe = pd.read_csv(self.directory_project + '/exports/' + file_name, sep=',', names=['x', 'y', 'z', data_type],
+    dataframe = pd.read_csv(self.directory_project + '/exports/' + file_name, sep=',', names=['tet', 'x', 'y', 'z', data_type],
                             usecols=[0, 1, 2, 3])
     xmin = str(np.floor(dataframe['x'].min()))
     xmax = str(np.ceil(dataframe['x'].max()))
@@ -1855,17 +1855,17 @@ def one_d_generation_export(self):
                                            font=('Helvetica', 16, 'bold'), justify='center')
     self.lbl_create_figs_tf.grid(column=0, row=0, padx=5, pady=5, columnspan=4)
 
-    self.lbl_x0_tf = ctk.CTkLabel(self.topframe, text="X0 ("+xmin+" to "+xmax+")", font=('Helvetica', 12, 'normal'))
+    self.lbl_x0_tf = ctk.CTkLabel(self.topframe, text="X0 ("+str(int(float(xmin)))+" to "+str(int(float(xmax)))+")", font=('Helvetica', 12, 'normal'))
     self.lbl_x0_tf.grid(column=0, row=1, padx=(5, 0), pady=5, sticky='e')
-    self.lbl_y0_tf = ctk.CTkLabel(self.topframe, text="Y0 ("+ymin+" to "+ymax+")", font=('Helvetica', 12, 'normal'))
+    self.lbl_y0_tf = ctk.CTkLabel(self.topframe, text="Y0 ("+str(int(float(ymin)))+" to "+str(int(float(ymax)))+")", font=('Helvetica', 12, 'normal'))
     self.lbl_y0_tf.grid(column=0, row=2, padx=(5, 0), pady=5, sticky='e')
-    self.lbl_z0_tf = ctk.CTkLabel(self.topframe, text="Z0 ("+zmin+" to "+zmax+")", font=('Helvetica', 12, 'normal'))
+    self.lbl_z0_tf = ctk.CTkLabel(self.topframe, text="Z0 ("+str(int(float(zmin)))+" to "+str(int(float(zmax)))+")", font=('Helvetica', 12, 'normal'))
     self.lbl_z0_tf.grid(column=0, row=3, padx=(5, 0), pady=5, sticky='e')
-    self.lbl_x1_tf = ctk.CTkLabel(self.topframe, text="X1 ("+xmin+" to "+xmax+")", font=('Helvetica', 12, 'normal'))
+    self.lbl_x1_tf = ctk.CTkLabel(self.topframe, text="X1 ("+str(int(float(xmin)))+" to "+str(int(float(xmax)))+")", font=('Helvetica', 12, 'normal'))
     self.lbl_x1_tf.grid(column=2, row=1, padx=(5, 0), pady=5, sticky='e')
-    self.lbl_y1_tf = ctk.CTkLabel(self.topframe, text="Y1 ("+ymin+" to "+ymax+")", font=('Helvetica', 12, 'normal'))
+    self.lbl_y1_tf = ctk.CTkLabel(self.topframe, text="Y1 ("+str(int(float(ymin)))+" to "+str(int(float(ymax)))+")", font=('Helvetica', 12, 'normal'))
     self.lbl_y1_tf.grid(column=2, row=2, padx=(5, 0), pady=5, sticky='e')
-    self.lbl_z1_tf = ctk.CTkLabel(self.topframe, text="Z1 ("+zmin+" to "+zmax+")", font=('Helvetica', 12, 'normal'))
+    self.lbl_z1_tf = ctk.CTkLabel(self.topframe, text="Z1 ("+str(int(float(zmin)))+" to "+str(int(float(zmax)))+")", font=('Helvetica', 12, 'normal'))
     self.lbl_z1_tf.grid(column=2, row=3, padx=(5, 0), pady=5, sticky='e')
 
     self.x0_entry = ctk.CTkEntry(self.topframe, width=60)
@@ -1898,7 +1898,6 @@ def one_d_generation_export(self):
 
 def one_d_generate_export_figure(self, dataframe, file_name, x0, y0, z0, x1, y1, z1):
     ...
-
 
 def two_d_generation_export(self):
     ...

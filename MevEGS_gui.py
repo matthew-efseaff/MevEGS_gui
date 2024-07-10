@@ -115,7 +115,9 @@ class MevegsGui:
         self.drop_menu_file.add_option(option='New Project', command=lambda: [utils.save_project(self)])
         self.drop_menu_file.add_separator()
         self.drop_menu_file.add_option(option='Exit', command=lambda: self.btn_exit_program())
-        self.drop_menu_file.add_option(option='Force Exit', command=lambda: self.btn_emergency_destroy())
+        self.drop_menu_file.add_separator()
+        self.drop_menu_file.add_separator()
+        self.drop_menu_file.add_option(option='Force Exit on Error', command=lambda: self.btn_emergency_destroy())
 
         self.drop_menu_settings = CustomDropdownMenu(widget=self.menu_bar_settings)
         self.drop_menu_settings.add_option(option='Full Screen (toggle)',

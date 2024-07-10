@@ -18,11 +18,11 @@ def btn_submit_cluster_jobs_clicked(self):
     os.chdir(self.directory_ini)
     file_source = self.menu_source_1.get()
     if file_source in ('', 'Choose source', 'None', 'NaN'):
-        command = 'local_job_submission ' + file_egsinp + ' ' + file_msh
+        command = 'local_job_submission_phasespace ' + file_egsinp + ' ' + file_msh
     else:
         shutil.copy2(self.directory_ini + 'Source_Phasespace_Files/' + self.menu_source_1.get(), self.directory_ini)
         _, file_source = os.path.split(self.directory_ini + self.menu_source_1.get())
-        command = 'local_job_submission ' + file_egsinp + ' ' + file_msh + ' ' + file_source
+        command = 'local_job_submission_phasespace ' + file_egsinp + ' ' + file_msh + ' ' + file_source
     job_file_name = 'mevegs_cluster_console_output_1.mvgs'
     if os.path.isfile(self.directory_ini + self.menu_source_1.get()):
         utils.write_to_console_log(self, "Mevegs:\t\tPhase-space file: " + str(self.directory_ini + self.menu_source_1.get()) + " included")
