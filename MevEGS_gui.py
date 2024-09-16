@@ -336,34 +336,47 @@ class MevegsGui:
         self.lbl_header_1 = ctk.CTkLabel(self.frame_1, text="Simulation Control", font=('Helvetica', 16, 'bold'),
                                          fg_color=("grey90", "gray10"), text_color=['black', 'white'], corner_radius=6)
         self.lbl_header_1.grid(column=0, row=0, padx=5, pady=2, sticky='we')
+
         # Visualize Sim (ptracks) and process
+
+        self.lbl_nptracks_2 = ctk.CTkLabel(self.frame_1,
+                                           text='Ceiling for the number of particle tracks created',
+                                           corner_radius=6)  # , text_color='black', fg_color='DarkGray'
+        self.lbl_nptracks_2.grid(column=0, row=1, padx=5, pady=2, sticky='we')
+        self.ptrack_number = ctk.IntVar()
+        self.entry_nptracks = ctk.CTkEntry(self.frame_1, textvariable=self.ptrack_number, width=60)
+        self.ptrack_number.set(10000)
+        self.entry_nptracks.configure("center", justify='center')
+        self.entry_nptracks.grid(column=0, row=2, padx=5, pady=2)
         self.btn_ptracks = ctk.CTkButton(self.frame_1, text="Visualize simulation geometry (ptracks)",
                                          command=self.btn_ptracks_clicked)
-        self.btn_ptracks.grid(column=0, row=1, padx=5, pady=2, sticky='we')
+        self.btn_ptracks.grid(column=0, row=3, padx=5, pady=2, sticky='we')
+
         # Run local mevegs with nJobs
+
         self.lbl_njobs = ctk.CTkLabel(self.frame_1,
                                       text='Number of Jobs: Max = number of CPUs\nMin = 1')
-        self.lbl_njobs.grid(column=0, row=2, padx=5, pady=2)
+        self.lbl_njobs.grid(column=0, row=4, padx=5, pady=2)
         self.job_number = ctk.StringVar()
         self.entry_njobs = ctk.CTkEntry(self.frame_1, textvariable=self.job_number, width=60)
         self.job_number.set(self.njobs)
         self.entry_njobs.configure("center", justify='center')
-        self.entry_njobs.grid(column=0, row=3, padx=5, pady=2)
+        self.entry_njobs.grid(column=0, row=5, padx=5, pady=2)
         self.entry_njobs.bind("<Return>", command=lambda event: self.btn_run_mevegs_clicked(event))  # This not working
         self.btn_run_mevegs = ctk.CTkButton(self.frame_1, text="Run local MevEGS", height=75,
                                             command=lambda: self.btn_run_mevegs_clicked(self.entry_njobs.get()))
-        self.btn_run_mevegs.grid(column=0, row=4, padx=5, pady=2, rowspan=2, sticky='n')
+        self.btn_run_mevegs.grid(column=0, row=6, padx=5, pady=2, rowspan=2, sticky='n')
         self.btn_show_mevegs_progressbar = ctk.CTkButton(self.frame_1, text="Track local progress",
                                                          command=lambda: self.btn_check_local_progress_clicked())
-        self.btn_show_mevegs_progressbar.grid(column=0, row=6, padx=5, pady=2, sticky='we')
+        self.btn_show_mevegs_progressbar.grid(column=0, row=8, padx=5, pady=2, sticky='we')
         self.mevegs_progress_bar = ctk.CTkProgressBar(self.frame_1)
-        self.mevegs_progress_bar.grid(column=0, row=7, padx=5, pady=2, sticky='we')
+        self.mevegs_progress_bar.grid(column=0, row=9, padx=5, pady=2, sticky='we')
         self.mevegs_progress_bar.set(self.bar_progress)
         self.percent_label = ctk.CTkLabel(self.frame_1, text='0%')
-        self.percent_label.grid(column=0, row=8, padx=5, pady=2)
+        self.percent_label.grid(column=0, row=10, padx=5, pady=2)
         self.btn_show_mevegs_jobs = ctk.CTkButton(self.frame_1, text="Show number of jobs running",
                                                   command=lambda: utils.btn_show_mevegs_jobs_clicked(self))
-        self.btn_show_mevegs_jobs.grid(column=0, row=9, padx=5, pady=2, sticky='we')
+        self.btn_show_mevegs_jobs.grid(column=0, row=11, padx=5, pady=2, sticky='we')
 
         # Clean up files from MevEGS.cpp folder
         self.lbl_header_11 = ctk.CTkLabel(self.frame_1, text="Simulation Cleanup", font=('Helvetica', 16, 'bold'),
@@ -1117,7 +1130,7 @@ class MevegsGui:
         # Setting a cutoff can be useful when there are many tracks, and you wish to lower the memory load of viewing the output in gmsh."
         # limit=10000  # This is an optional arg... may wish to make this a gui option
         # units='mm'  # This is an optional arg... may wish to make this a gui option
-        pt.process_ptracks(file_ptracks, ptracks_output_file, limit=10000,
+        pt.process_ptracks(file_ptracks, ptracks_output_file, limit=int(self.entry_nptracks.get()),
                            units='mm')  # Post_processing.py function added
         if os.path.isfile(self.directory_mevegs + ptracks_output_file):
             if os.path.isdir(self.directory_project) and os.path.isfile(self.directory_project + ptracks_output_file):
