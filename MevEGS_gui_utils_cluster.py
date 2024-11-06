@@ -210,7 +210,7 @@ def btn_display_cluster_log_file_clicked_2(self, username):
     _, file_egsinp = os.path.split(self.directory_file_egsinp)
     egsinp_ = file_egsinp.split('.egsinp')[0]
     if username != 'Choose':
-        cmd1 = str('scp -r MDE@jericho-jobctrl.mevex.local:/home/'+username+'/electron-gamma-shower/egs_home/mevegs/*/*_w1.egslog ./')  # .mevex.local
+        cmd1 = str('scp '+username+'@jericho-jobctrl.mevex.local:/home/'+username+'/electron-gamma-shower/egs_home/mevegs/egsrun_*/*_w1.egslog ./')  # .mevex.local
         process = subprocess.Popen(cmd1)
         process.wait()
         log_info = []

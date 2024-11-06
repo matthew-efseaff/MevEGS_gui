@@ -16,6 +16,8 @@ REQUIREMENTS:
 * addphsp.exe (hidden in HEN_HOUSE/bin/mevegs/
 * beampd.bat (in previously mentioned post_processing directory) - possible to change particle max quantity to suit
 * import statement modules
+    - CTkMenuBar
+    - CTkTable
     - CTkXYFrame included here in same folder as README.txt
         - Originally sourced from https://github.com/Akascape/CTkXYFrame)
         - CTkXYFrame folder must reside in same directory as 'MevEGS_gui.py'

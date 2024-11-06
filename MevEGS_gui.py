@@ -25,10 +25,12 @@ from tkinter import filedialog
 import customtkinter as ctk
 import MevEGS_gui_utils as utils
 import MevEGS_gui_utils_cluster as cluster
+import Scanned_beam_source_creator as sbsc
 from Post_Processing import ptracks as pt
 import posixpath
 from CTkMenuBar import *  # import CTkMenuBar
 from CTkXYFrame import *
+from CTkTable import *
 
 # import matplotlib.pyplot as plt
 # import tkinter as tk
@@ -62,6 +64,8 @@ class MevegsGui:
     color_theme = ''
     scaling = ''
     username = ''
+    directory_file_cst_source = 'Choose CST Source File'
+    dataframe_cst_file = ''
 
     # IF RUN BY COMMAND LINE like >python 'mevegs_gui_program_name.py'
     # Below saves an initialization file to the location of this MevEGS app .py file
@@ -174,6 +178,8 @@ class MevegsGui:
 
         self.tabview = ctk.CTkTabview(master=gui, anchor='nw', command=self.btn_update_tabs)
         self.tabview.pack()
+        self.tab_create_s = self.tabview.add('Create Source')
+        self.tab_create_s.grid_columnconfigure(0, weight=1)
         self.tab_inputs = self.tabview.add('Source Files')
         self.tab_inputs.grid_columnconfigure(0, weight=1)
         self.tab_1 = self.tabview.add('Simulate')
@@ -197,6 +203,9 @@ class MevegsGui:
         # SOURCE FILES TAB INPUT
         window_height = 0.815
         window_width = 0.975
+        self.frame_create_s = CTkXYFrame(self.tab_create_s, width=window_width * scale_factor * size_tuple[1],
+                                       height=window_height * scale_factor * size_tuple[0], scrollbar_width=20)
+        self.frame_create_s.grid(row=0, column=0, pady=4, padx=4, sticky='nesw')
         self.frame_inputs = CTkXYFrame(self.tab_inputs, width=window_width * scale_factor * size_tuple[1],
                                        height=window_height * scale_factor * size_tuple[0], scrollbar_width=20)
         self.frame_inputs.grid(row=0, column=0, pady=4, padx=4, sticky='nesw')
@@ -214,6 +223,43 @@ class MevegsGui:
         self.gui.protocol("WM_DELETE_WINDOW", self.btn_on_x_exit)
 
         self.menu_source, menu_sources_path, menu_sources = self.source_list_populate()
+
+        # TAB Create beam source
+        # Column 0
+        self.lbl_header_input_source = ctk.CTkLabel(self.frame_create_s, text="CST Source",
+                                             font=('Helvetica', 16, 'bold'), fg_color=("grey90", "gray10"),
+                                             text_color=['black', 'white'], corner_radius=6)
+        self.lbl_header_input_source.grid(column=0, row=0, padx=5, pady=2, sticky='we')
+        self.lbl_project_source = ctk.CTkLabel(self.frame_create_s, text="CST file")
+        self.lbl_project_source.grid(column=0, row=1, padx=5, pady=2, sticky='e')
+
+            # Console Source
+        self.lbl_header_source = ctk.CTkLabel(self.frame_create_s, text="Console Log", font=('Helvetica', 16, 'bold'),
+                                             fg_color=("grey90", "gray10"), text_color=['black', 'white'],
+                                             corner_radius=6)
+        self.lbl_header_source.grid(column=0, row=19, padx=5, pady=1, sticky='we', columnspan=5)
+        self.console_text_box_source = ctk.CTkTextbox(master=self.frame_create_s, wrap='word', width=600, height=250,
+                                                     fg_color=['grey90',
+                                                               'grey10'])  # , text_color=['black', 'white'], state='disabled')
+        self.console_text_box_source.grid(column=0, row=20, padx=5, pady=2, sticky='nesw', columnspan=5, rowspan=18)
+
+        # Column 1
+        self.lbl_header_input_source1 = ctk.CTkLabel(self.frame_create_s, text="Title",
+                                              font=('Helvetica', 16, 'bold'), fg_color=("grey90", "gray10"),
+                                              text_color=['black', 'white'], corner_radius=6)
+        self.lbl_header_input_source1.grid(column=1, row=0, padx=5, pady=2, sticky='we', columnspan=2)
+        self.btn_cst_file_explore = ctk.CTkButton(self.frame_create_s, text=self.directory_file_cst_source,
+                                                command=lambda: sbsc.btn_cst_file_explore_clicked(self))
+        self.btn_cst_file_explore.grid(column=1, row=1, padx=(5, 0), pady=2, sticky='we')
+        self.btn_cst_data_preview = ctk.CTkButton(self.frame_create_s, text='Preview Source Spot',
+                                                  command=lambda: sbsc.btn_cst_data_preview_clicked(self))
+        self.btn_cst_data_preview.grid(column=1, row=9, padx=(5, 0), pady=2, sticky='we')
+
+        # Table below
+
+        self.table_cst_source = CTkTable(master=self.frame_create_s, row=9, column=3, values=self.dataframe_cst_file)
+        self.table_cst_source.grid(column=0, row=8, padx=(5,5), pady=2, sticky='we')
+
         # Choose project directory
         self.lbl_header_input = ctk.CTkLabel(self.frame_inputs, text="Source Item",
                                              font=('Helvetica', 16, 'bold'), fg_color=("grey90", "gray10"),
