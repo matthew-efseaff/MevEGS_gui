@@ -44,7 +44,7 @@ if getattr(sys, 'frozen', False):
 
 # main class
 class MevegsGui:
-    version = 'Version 1.0.0'
+    version = 'Version 1.0.1'
     directory_ini = 'Error - not initialized'
     directory_mevegs = 'Choose MEVEGS Home Directory'
     directory_file_egsinp = 'Choose .egsinp File'
