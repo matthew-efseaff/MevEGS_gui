@@ -42,7 +42,7 @@ def abort(*args, **kwargs):
 
 def write_to_console_log(self, _text):
     dt = datetime.datetime.now().replace(microsecond=0)
-    self.console_text_box_source.insert("0.0", text='\n' + str(dt.time()) + ' - ' + _text + '\n')
+    # self.console_text_box_source.insert("0.0", text='\n' + str(dt.time()) + ' - ' + _text + '\n')
     self.console_text_box_input.insert("0.0", text='\n' + str(dt.time()) + ' - ' + _text + '\n')
     self.console_text_box_1.insert("0.0", text='\n' + str(dt.time()) + ' - ' + _text + '\n')
     self.console_text_box_2.insert("0.0", text='\n' + str(dt.time()) + ' - ' + _text + '\n')
@@ -138,17 +138,17 @@ class MshResults_io:
         self.file = msh_file
         self.file_inp = os.path.basename(egsinp_file)  # .split('/')[-1]
         self.directory = project_directory
-        self.console_text_box_source = console_text_box_list[0]
-        self.console_text_box_input = console_text_box_list[1]
-        self.console_text_box_1 = console_text_box_list[2]
-        self.console_text_box_2 = console_text_box_list[3]
-        self.console_text_box_3 = console_text_box_list[4]
+        # self.console_text_box_source = console_text_box_list[0]
+        self.console_text_box_input = console_text_box_list[0]
+        self.console_text_box_1 = console_text_box_list[1]
+        self.console_text_box_2 = console_text_box_list[2]
+        self.console_text_box_3 = console_text_box_list[3]
         self.views_to_save = []
         self.groups_to_save = []
         if gmsh.isInitialized():
             pass
         else:
-            gmsh.initialize()
+            gmsh.initialize(['-noenv'])
         gmsh.open(self.file)
 
     def add_view_to_save(self, view: int):
@@ -184,7 +184,7 @@ class MshResults_io:
         # print(node_coordinates[:50])
         self.node_coordinates = reshape_2d(node_coordinates, 3)
 
-    def output_views_2(self, avg_beam_current, length_units, export_choice, volumes_to_include_list):
+    def output_views_2(self, avg_beam_current, mass_units, length_units, vol_units, export_choice, volumes_to_include_list):
         write_to_console_log(self, "GMSH:\t\tCalculating tet centroids")
         physical_group_name_to_save = [self.group_names[i - 1] for i in self.groups_to_save]
         view_names_to_save = [self.view_names[i - 1] for i in self.views_to_save]
@@ -238,7 +238,11 @@ class MshResults_io:
                 if not line.startswith('#'):  # ignore commented out lines
                     if re.search('scaling=', line, re.IGNORECASE):  # find scaling factor
                         scaling_factor = float((line.split('='))[-1])
-
+        # Sort user selected mass units for output
+        if mass_units == 'g':
+            mass_unit_value = 1
+        elif mass_units == 'kg':
+            mass_unit_value = 0.001
         # Sort user selected gmsh length units for output
         if length_units == 'mm':
             length_unit_value = 10
@@ -247,10 +251,21 @@ class MshResults_io:
         elif length_units == 'm':
             length_unit_value = 0.01
         else:
-            write_to_console_log(self, "GMSH:\t\tError with MevEGS to GMSH unit conversion")
+            write_to_console_log(self, "GMSH:\t\tError with MEVEGS to GMSH unit conversion")
+        # Sort user selected Power Density units for output
+        unicode_list = ['\u00b3']  # unicode for cubed
+        if vol_units == 'mm' + unicode_list[0]:
+            vol_unit_value = 0.000001
+        elif vol_units == 'cm' + unicode_list[0]:
+            vol_unit_value = 1
+        elif vol_units == 'm' + unicode_list[0]:
+            vol_unit_value = 1000000
+        else:
+            write_to_console_log(self, "GMSH:\t\tError with MEVEGS to GMSH volume unit conversion")
         # Save individual views and group exports
         vols_chosen_list_a = [x for xs in vols_chosen_list for x in xs]  # appends volumes to export file
         vols_chosen_list_b = ''.join(str(vols_chosen_list_a))
+        vols_chosen_list_b = vols_chosen_list_b.replace('[','(').replace(']',')').replace(', ', '_')
         group_list = []
         for name in view_names_to_save:
             df = pd.read_csv(directory_exports + result_file,
@@ -264,10 +279,24 @@ class MshResults_io:
                 name = name.replace(' [%]', '')
             elif '[cm^3]' in name:
                 name = name.replace(' [cm^3]', '')
+                df[' Volume [cm^3]'] *= 1/vol_unit_value
+                if vol_units.startswith('mm'):
+                    name = name + '_mm3'
+                elif vol_units.startswith('cm'):
+                    name = name + '_cm3'
+                else:
+                    name = name + '_m3'
             elif '[W/cm^3/A]' in name:  # transform PD/A to PD below
                 name = name.replace(' per Amp [W/cm^3/A]', '')
             elif '[g/cm^3]' in name:
                 name = 'Density'
+                df[' Density [g/cm^3]'] *= vol_unit_value * mass_unit_value
+                if vol_units.startswith('mm'):
+                    name = name + '_' + mass_units + 'mm3'
+                elif vol_units.startswith('cm'):
+                    name = name + '_' + mass_units + 'cm3'
+                else:
+                    name = name + '_' + mass_units + 'm3'
             elif '[kg]' in name:
                 name = name.replace(' [kg]', '')
             elif '[Gy/C]' in name:
@@ -280,8 +309,13 @@ class MshResults_io:
             group_string = '-'.join(group_list)
             if name == 'Power Density':
                 df[
-                    ' Power Density per Amp [W/cm^3/A]'] *= avg_beam_current / 1000  # avg_beam_current in mA, /1000 converts to Amps
-                name = 'PD_Wcm3_avg-beam_' + str(avg_beam_current) + 'mA'
+                    ' Power Density per Amp [W/cm^3/A]'] *= vol_unit_value * avg_beam_current / 1000  # avg_beam_current in mA, /1000 converts to Amps
+                if vol_units.startswith('mm'):
+                    name = 'PD_Wmm3_avg-beam_' + str(avg_beam_current) + 'mA'
+                elif vol_units.startswith('cm'):
+                    name = 'PD_Wcm3_avg-beam_' + str(avg_beam_current) + 'mA'
+                else:
+                    name = 'PD_Wm3_avg-beam_' + str(avg_beam_current) + 'mA'
             name = name.replace(" ", "_")
             name_units = '_units-' + length_units
             df.to_csv(directory_exports + name + name_units + '_' + group_string + vols_chosen_list_b + '.csv',
@@ -289,6 +323,7 @@ class MshResults_io:
             group_list = []
         os.remove(directory_exports + result_file)
         write_to_console_log(self, "GMSH:\t\tFiles saved in " + directory_exports)
+        # os.chdir(self.directory_ini)
 
     def return_1D(self, view=0, x0=0, y0=0, z0=0, x1=0, y1=0, z1=0, NumPointsU=0):
         new_view = self.create_straight_line(view, x0, y0, z0, x1, y1, z1, NumPointsU)
@@ -362,13 +397,10 @@ def btn_results_mesh_explore_clicked(self):
     self.directory_file_project_msh = directory_file_project_msh
     if self.directory_file_project_msh.startswith("Choose"):
         self.btn_results_mesh_explore.configure(text=self.directory_file_project_msh)
+        write_to_console_log(self, 'MEVEGS:\t\tNo .results.msh file chosen')
     else:
         self.btn_results_mesh_explore.configure(
             text='.'.join(os.path.basename(self.directory_file_project_msh).split('.')[:-2]))
-    # if directory_file_project_msh == 'Choose .results.msh File':
-    #     pass
-    # else:
-    #     load_available_gmsh_views(self)
     return self.directory_file_project_msh
 
 
@@ -376,7 +408,7 @@ def btn_results_mesh_explore_clicked(self):
 #     if gmsh.isInitialized():
 #         pass
 #     else:
-#         gmsh.initialize()
+#         gmsh.initialize(['-noenv'])
 #     gmsh.logger.start()
 #     gmsh.open(self.directory_file_project_msh)
 #     views_tags = gmsh.view.getTags()
@@ -501,7 +533,7 @@ def btn_generate_new_views(self, btn_list, chk_list):
     if gmsh.isInitialized():
         pass
     else:
-        gmsh.initialize()
+        gmsh.initialize(['-noenv'])
     gmsh.open(self.directory_file_project_msh)
     for count, var in enumerate(chk_list):
         if var.get():
@@ -616,7 +648,7 @@ def get_volume_totals(viewTag):
 # ...
 #     # if self.gmsh_views == '':
 #     #     load_available_gmsh_views(self)
-#     # gmsh.initialize()
+#     # gmsh.initialize(['-noenv'])
 #     # gmsh.open(self.directory_file_project_msh)
 #     #
 #     # self.topframe = ctk.CTkToplevel(self.gui)
@@ -728,7 +760,7 @@ def get_volume_totals(viewTag):
 
 # def btn_show_views_clicked(self, btn_list, chk_list):
 #     ...
-#     # # gmsh.initialize()
+#     # # gmsh.initialize(['-noenv'])
 #     # views_list = []
 #     # for count, var in enumerate(chk_list):
 #     #     if var.get():
@@ -820,7 +852,7 @@ def btn_choose_export_data_clicked(self):
     self.topframe.grab_set()
     # self.topframe.geometry("600x700")
     self.topframe.attributes('-topmost', True)
-    self.topframe.geometry("+0+0")
+    self.topframe.geometry("+200+200")
     self.topframe.update()
     self.topframe.focus()
     self.topframe.title('Export views - groups - volumes')
@@ -830,7 +862,7 @@ def btn_choose_export_data_clicked(self):
     if gmsh.isInitialized():
         pass
     else:
-        gmsh.initialize()
+        gmsh.initialize(['-noenv'])
     gmsh.open(self.directory_file_project_msh)
     views_list = []
     checkvar_views_list = []
@@ -847,21 +879,35 @@ def btn_choose_export_data_clicked(self):
     self.lbl_group.grid(column=2, row=0, pady=10, padx=10)
     self.lbl_volume = ctk.CTkLabel(self.topframe, text_color=('grey1', 'white'), text='VOLUMES')
     self.lbl_volume.grid(column=3, row=0, pady=10, padx=10)
-    # if 'Power Density per Amp [W/cm^3/A]' in views_names:
-    avg_beam_current = ctk.StringVar()
-    self.lbl_milliamps = ctk.CTkLabel(self.topframe, text='Avg Beam\nCurrent (mA)')
-    self.lbl_milliamps.grid(column=0, row=views_rows + 2, pady=(0, 10), padx=10, sticky='e')
-    self.entry_milliamps = ctk.CTkEntry(self.topframe, width=200, textvariable=avg_beam_current, justify='center')
-    self.entry_milliamps.grid(column=1, row=views_rows + 2, pady=(0, 10), padx=10, sticky='w')
-    avg_beam_current.set('1')
-
-    self.lbl_lengths = ctk.CTkLabel(self.topframe, text='Tet centroid\nlength units')
+    if 'Power Density per Amp [W/cm^3/A]' in views_names:
+        avg_beam_current = ctk.StringVar()
+        self.lbl_milliamps = ctk.CTkLabel(self.topframe, text='Avg Beam\nCurrent (mA)')
+        self.lbl_milliamps.grid(column=0, row=views_rows + 2, pady=(0, 10), padx=10, sticky='e')
+        self.entry_milliamps = ctk.CTkEntry(self.topframe, width=200, textvariable=avg_beam_current, justify='center')
+        self.entry_milliamps.grid(column=1, row=views_rows + 2, pady=(0, 10), padx=10, sticky='w')
+        avg_beam_current.set('1')
+    self.lbl_lengths = ctk.CTkLabel(self.topframe, text='Length units')
     self.lbl_lengths.grid(column=0, row=views_rows + 3, pady=(0, 10), padx=10, sticky='e')
     self.btn_lengths = ctk.CTkSegmentedButton(self.topframe, width=200, values=['mm', 'cm', 'm'],
                                               dynamic_resizing=False)
     self.btn_lengths.grid(column=1, row=views_rows + 3, pady=(0, 10), padx=10, sticky='w')
     self.btn_lengths.set('mm')
-
+    if 'Density [g/cm^3]' in views_names:
+        self.lbl_mass = ctk.CTkLabel(self.topframe, text='Mass units')
+        self.lbl_mass.grid(column=0, row=views_rows + 4, pady=(0, 10), padx=10, sticky='e')
+        self.btn_mass = ctk.CTkSegmentedButton(self.topframe, width=200, values=['g', 'kg'], dynamic_resizing=False)
+        self.btn_mass.grid(column=1, row=views_rows + 4, pady=(0, 10), padx=10, sticky='w')
+        self.btn_mass.set('g')
+    if 'Volume [cm^3]' or 'Density [g/cm^3]' or 'Power Density per Amp [W/cm^3/A]' in views_names:
+        self.lbl_volumes = ctk.CTkLabel(self.topframe, text='Volume units')
+        self.lbl_volumes.grid(column=0, row=views_rows + 5, pady=(0, 10), padx=10, sticky='e')
+        unicode_list = ['\u00b3']  # unicode for cubed
+        self.btn_volumes = ctk.CTkSegmentedButton(self.topframe, width=200, values=['mm'+unicode_list[0],
+                                                                                       'cm'+unicode_list[0],
+                                                                                       'm'+unicode_list[0]],
+                                                                                       dynamic_resizing=False)
+        self.btn_volumes.grid(column=1, row=views_rows + 5, pady=(0, 10), padx=10, sticky='w')
+        self.btn_volumes.set('mm'+unicode_list[0])
     # COLUMN 2 - Groups
     physical_groups_list = []
     checkvar_groups_list = []
@@ -908,17 +954,24 @@ def btn_choose_export_data_clicked(self):
     # BUTTONS
     self.add_view_button = ctk.CTkButton(self.topframe, text='Export selected view(s) of selected material(s)',
                                          height=40, command=lambda: [
-            check_btn_export_view(self, checkvar_views_list, checkvar_groups_list, volume_list,
-                                  float(self.entry_milliamps.get()), str(self.btn_lengths.get())), self.data_list_populate()])
+                                check_btn_export_view(self, checkvar_views_list, checkvar_groups_list, volume_list,
+                                  float(self.entry_milliamps.get()), str(self.btn_mass.get()), str(self.btn_lengths.get()),
+                                  str(self.btn_volumes.get())), self.data_list_populate()])
     self.add_view_button.grid(column=1, row=group_rows + 1, pady=10, padx=(10, 5), sticky='nesw', columnspan=2)
     self.add_group_button = ctk.CTkButton(self.topframe, text='Export selected view(s) of material(s) and volume(s)',
                                           height=40, command=lambda: [
-            check_btn_export_group(self, checkvar_views_list, checkvar_groups_list, volume_list,
-                                   float(self.entry_milliamps.get()), str(self.btn_lengths.get())), self.data_list_populate()])
+                                check_btn_export_group(self, checkvar_views_list, checkvar_groups_list, volume_list,
+                                    float(self.entry_milliamps.get()), str(self.btn_mass.get()), str(self.btn_lengths.get()),
+                                    str(self.btn_volumes.get())), self.data_list_populate()])
     self.add_group_button.grid(column=3, row=group_rows + 1, pady=10, padx=(5, 10), sticky='nesw', columnspan=5)
     self.exit_button = ctk.CTkButton(master=self.topframe, text='Close',
                                      command=lambda: [self.btn_exit_popup(), check_gmsh_initialized(self)])
-    self.exit_button.grid(column=1, row=group_rows + 2, pady=(10, 25), padx=10, sticky='nesw', columnspan=10)
+    self.exit_button.grid(column=1, row=group_rows + 2, pady=(10, 5), padx=10, sticky='nesw', columnspan=10)
+    self.lbl_message_box = ctk.CTkLabel(self.topframe, text_color=('grey1', 'white'), text='Console log (Post Process tab) will show when/where dataset file is exported')
+    self.lbl_message_box.grid(column=1, row=group_rows + 3, pady=5, padx=10, columnspan=5)
+    self.btn_open_exports = ctk.CTkButton(master=self.topframe, text='Open exports folder',
+                                     command=lambda: [os.startfile(self.directory_project + '/exports/')])
+    self.btn_open_exports.grid(column=1, row=group_rows + 4, pady=(10, 5), padx=10, sticky='nesw', columnspan=10)
 
 def check_gmsh_initialized(self):
     if gmsh.isInitialized():
@@ -981,14 +1034,15 @@ class ViewsCheckboxFrame(ctk.CTkScrollableFrame):
         return checked_checkboxes
 
 
-def check_btn_export_view(self, checkvar_views_list, checkvar_groups_list, volume_list, avg_beam_mA, length_units):
+def check_btn_export_view(self, checkvar_views_list, checkvar_groups_list, volume_list, avg_beam_mA,  mass_units, length_units,
+                          vol_units):
     export_choice = 0
     if gmsh.isInitialized():
         pass
     else:
-        gmsh.initialize()
+        gmsh.initialize(['-noenv'])
     msh_data = MshResults_io(self.directory_file_project_msh, self.directory_project, self.directory_file_egsinp,
-                             [self.console_text_box_source, self.console_text_box_input, self.console_text_box_1, self.console_text_box_2, self.console_text_box_3])
+                             [self.console_text_box_input, self.console_text_box_1, self.console_text_box_2, self.console_text_box_3])  # self.console_text_box_source,
     msh_data.load_model_information()
     groups = msh_data.get_physical_groups()
     views = msh_data.get_all_views()
@@ -998,19 +1052,19 @@ def check_btn_export_view(self, checkvar_views_list, checkvar_groups_list, volum
     for i, view in enumerate(views):
         if checkvar_views_list[i].get():
             msh_data.add_view_to_save(i)
-    msh_data.output_views_2(avg_beam_mA, length_units, export_choice, volume_list)
+    msh_data.output_views_2(avg_beam_mA,  mass_units, length_units, vol_units, export_choice, volume_list)
     gmsh.finalize()
 
 
-def check_btn_export_group(self, checkvar_views_list, checkvar_groups_list, volume_list, avg_beam_mA,
-                           length_units):  # change volume list to only include groups... see i
+def check_btn_export_group(self, checkvar_views_list, checkvar_groups_list, volume_list, avg_beam_mA, mass_units,
+                           length_units, vol_units):  # change volume list to only include groups... see i
     export_choice = 1
     if gmsh.isInitialized():
         pass
     else:
-        gmsh.initialize()
+        gmsh.initialize(['-noenv'])
     msh_data = MshResults_io(self.directory_file_project_msh, self.directory_project, self.directory_file_egsinp,
-                             [self.console_text_box_source, self.console_text_box_input, self.console_text_box_1, self.console_text_box_2, self.console_text_box_3])
+                             [self.console_text_box_input, self.console_text_box_1, self.console_text_box_2, self.console_text_box_3])  # self.console_text_box_source,
     msh_data.load_model_information()
     groups = msh_data.get_physical_groups()
     views = msh_data.get_all_views()
@@ -1022,7 +1076,7 @@ def check_btn_export_group(self, checkvar_views_list, checkvar_groups_list, volu
     for i, view in enumerate(views):
         if checkvar_views_list[i].get():
             msh_data.add_view_to_save(i)
-    msh_data.output_views_2(avg_beam_mA, length_units, export_choice, volumes_to_include_list)
+    msh_data.output_views_2(avg_beam_mA,  mass_units, length_units, vol_units, export_choice, volumes_to_include_list)
     gmsh.finalize()
 
 
@@ -1060,20 +1114,20 @@ def process_phase_space_files(self):
     time.sleep(5)
     for i in range(len(phsp_filenames)):
         while progress_phase[i].poll() is None:
-            write_to_console_log(self, "MevEGS:\t\tWorking on combining phase-space files...")
+            write_to_console_log(self, "MEVEGS:\t\tWorking on combining phase-space files...")
             time.sleep(10)
     else:
-        write_to_console_log(self, "MevEGS:\t\tCombining jobs complete")
+        write_to_console_log(self, "MEVEGS:\t\tCombining jobs complete")
     time.sleep(1)
     process_human_phase_space_files(self, phsp_filenames)
 
 
 def process_human_phase_space_files(self, phsp_filenames):
-    write_to_console_log(self, "MevEGS:\t\tPreparing human readable phase space files...")
+    write_to_console_log(self, "MEVEGS:\t\tPreparing human readable phase space files...")
     # Convert to human-readable, hardcoded beamdp option 11
     # move beamdp.bat to working dir
     directory_project = self.directory_project + 'phase_space_files/'
-    shutil.copy2(self.directory_post_pro + 'beamdp.bat', directory_project)
+    shutil.copy2(self.directory_ini + 'beamdp.bat', directory_project)
     progress_read = []
     for j in range(len(phsp_filenames)):
         command = 'beamdp.bat ' + phsp_filenames[j] + '.egsphsp1'
@@ -1081,9 +1135,9 @@ def process_human_phase_space_files(self, phsp_filenames):
     time.sleep(5)
     for i in range(len(phsp_filenames)):
         while progress_read[i].poll() is None:
-            write_to_console_log(self, "MevEGS:\t\tPreparing human readable phase space files " + str(i + 1) + '...')
+            write_to_console_log(self, "MEVEGS:\t\tPreparing human readable phase space files " + str(i + 1) + '...')
             time.sleep(10)
-    write_to_console_log(self, "MevEGS:\t\tReadable particle phase space files saved in: " + directory_project)
+    write_to_console_log(self, "MEVEGS:\t\tReadable particle phase space files saved in: " + directory_project)
     # delete beamdp.bat
     os.remove(directory_project + 'beamdp.bat')
     items_egsphsp1 = glob.glob(directory_project + '*_w[1-9].egsphsp1', recursive=False)  # _w[1-9].egsphsp1 files
@@ -1094,7 +1148,7 @@ def process_human_phase_space_files(self, phsp_filenames):
     for object_ in items_egsphsp2:
         if os.path.isfile(object_):
             os.remove(object_)  # junk files
-    os.chdir(self.directory_mevegs)  # back to mevegs home
+    os.chdir(self.directory_ini)  # back to mevegs home
 
 
 def btn_kill_mevegs_clicked(self):
@@ -1107,7 +1161,7 @@ def btn_kill_mevegs_clicked(self):
         time.sleep(1)
     with open(job_file_name, "r") as f:
         contents = f.read()
-        write_to_console_log(self, "MevEGS:\t\t" + contents)
+        write_to_console_log(self, "MEVEGS:\t\t" + contents)
     os.remove(job_file_name)
     self.quit_progress_bar = True
 
@@ -1164,12 +1218,12 @@ def btn_show_mevegs_jobs_clicked(self):
     for process in f.Win32_Process():
         if process.Name == 'mevegs.exe':
             count += 1
-    write_to_console_log(self, 'MevEGS:\t\tThere are ' + str(count) + ' local jobs running')
+    write_to_console_log(self, 'MEVEGS:\t\tThere are ' + str(count) + ' local jobs running')
     self.frame_1.update_idletasks()
 
 
 def return_running_jobs_to_null(self):
-    write_to_console_log(self, 'MevEGS:\t\tThere are 0 local jobs running')
+    write_to_console_log(self, 'MEVEGS:\t\tThere are 0 local jobs running')
     self.gui.update_idletasks()
 
 
@@ -1183,45 +1237,62 @@ def menu_full_screen_clicked(self):
 
 
 def load_gmsh_data_for_figures(self, path_results_msh_file, path_directory_project, path_egsinp_file):
-    if gmsh.isInitialized():
-        pass
+    if path_results_msh_file == 'Choose .results.msh File':
+        write_to_console_log(self, 'GMSH:\t\t' + 'There is no .results.msh file in this project')
+        try:
+            if self.view_scroll_frame_3.winfo_exists():
+                self.view_scroll_frame_3.destroy()
+        except AttributeError:
+            pass
+        try:
+            if self.view_scroll_frame.winfo_exists():
+                self.view_scroll_frame.destroy()
+        except AttributeError:
+            pass
+        empty_dict = {}
+        self.view_scroll_frame = ViewsCheckboxFrame(self.frame_3, 'Views', list(empty_dict.keys()))
+        self.view_scroll_frame.grid(column=0, row=4, pady=5, padx=5, sticky='w', rowspan=5)
     else:
-        gmsh.initialize()
-    gmsh.logger.start()
-    msh_data = MshResults_io(path_results_msh_file, path_directory_project, path_egsinp_file, [self.console_text_box_source, self.console_text_box_input, self.console_text_box_1, self.console_text_box_2, self.console_text_box_3])
-    msh_data.load_model_information()
-    view_tags = gmsh.view.getTags()
-    view_names = msh_data.get_all_views()
-    self.view_dict = {view_names[i]: view_tags[i] - 1 for i in range(len(view_names))}
-    self.gmsh_views = '\n'.join(view_names)
-    try:
-        if self.view_scroll_frame_3.winfo_exists():
-            self.view_scroll_frame_3.destroy()
-    except AttributeError:
-        pass
-    try:
-        if self.view_scroll_frame.winfo_exists():
-            self.view_scroll_frame.destroy()
-    except AttributeError:
-        pass
-    self.view_scroll_frame = ViewsCheckboxFrame(self.frame_3, 'Views', list(self.view_dict.keys()))
-    self.view_scroll_frame.grid(column=0, row=4, pady=5, padx=5, sticky='w', rowspan=5)
+        if gmsh.isInitialized():
+            pass
+        else:
+            gmsh.initialize(['-noenv'])
+        gmsh.logger.start()
+        msh_data = MshResults_io(path_results_msh_file, path_directory_project, path_egsinp_file, [self.console_text_box_input, self.console_text_box_1, self.console_text_box_2, self.console_text_box_3])  # self.console_text_box_source,
+        msh_data.load_model_information()
+        view_tags = gmsh.view.getTags()
+        view_names = msh_data.get_all_views()
+        self.view_dict = {view_names[i]: view_tags[i] - 1 for i in range(len(view_names))}
+        self.gmsh_views = '\n'.join(view_names)
+        try:
+            if self.view_scroll_frame_3.winfo_exists():
+                self.view_scroll_frame_3.destroy()
+        except AttributeError:
+            pass
+        try:
+            if self.view_scroll_frame.winfo_exists():
+                self.view_scroll_frame.destroy()
+        except AttributeError:
+            pass
+        self.view_scroll_frame = ViewsCheckboxFrame(self.frame_3, 'Views', list(self.view_dict.keys()))
+        self.view_scroll_frame.grid(column=0, row=4, pady=5, padx=5, sticky='w', rowspan=5)
 
-    # gmsh.open(self.directory_file_project_msh)
-    # views_names = [gmsh.option.getString(f'View[{gmsh.view.getIndex(tag)}].Name') for tag in views_tags]
-    # self.gmsh_views = '\n'.join(views_names)
-    gmsh_views_log = gmsh.logger.get()
-    str_gmsh_views_log = '\n'.join(gmsh_views_log)
-    gmsh.logger.stop()
-    write_to_console_log(self, 'GMSH:\t\t' + str_gmsh_views_log)
-    gmsh.finalize()  # might not need this
-    return self.view_dict
+        # gmsh.open(self.directory_file_project_msh)
+        # views_names = [gmsh.option.getString(f'View[{gmsh.view.getIndex(tag)}].Name') for tag in views_tags]
+        # self.gmsh_views = '\n'.join(views_names)
+        gmsh_views_log = gmsh.logger.get()
+        str_gmsh_views_log = '\n'.join(gmsh_views_log)
+        gmsh.logger.stop()
+        write_to_console_log(self, 'GMSH:\t\t' + str_gmsh_views_log)
+        gmsh.finalize()  # might not need this
+        os.chdir(self.directory_ini)
+        return self.view_dict
 
 
 def one_d_generation_gmsh(self):
     checked_view_list = self.view_scroll_frame.get()
     if len(checked_view_list) > 1:
-        write_to_console_log(self, "MevEGS:\t\tOnly one GMSH view can be checked")
+        write_to_console_log(self, "MEVEGS:\t\tOnly one GMSH view can be checked")
         return
     checked_view = ''.join(checked_view_list)
     view_tag = self.view_dict[checked_view]
@@ -1234,7 +1305,8 @@ def one_d_generation_gmsh(self):
     self.topframe.title('1D Coordinates - ' + checked_view)
     self.topframe.update()
     msh_data = MshResults_io(self.directory_file_project_msh, self.directory_project, self.directory_file_egsinp,
-                             [self.console_text_box_source, self.console_text_box_input, self.console_text_box_1, self.console_text_box_2, self.console_text_box_3])
+                             [self.console_text_box_input, self.console_text_box_1,
+                                self.console_text_box_2, self.console_text_box_3])  # self.console_text_box_source,
     msh_data.load_model_information()
     self.lbl_create_figs_tf = ctk.CTkLabel(self.topframe, text="Enter start- and end-points",
                                            font=('Helvetica', 16, 'bold'), justify='center')
@@ -1355,13 +1427,13 @@ def save_fig_to_gmsh(self, figure, save_name):
     os.makedirs(self.directory_project + 'figures/', exist_ok=True)
     figure.savefig(self.directory_project + 'figures/' + save_name)
     self.btn_exit_popup()
-    write_to_console_log(self, "MevEGS:\t\tFigure saved to " + self.directory_project + 'figures/' + save_name)
+    write_to_console_log(self, "MEVEGS:\t\tFigure saved to " + self.directory_project + 'figures/' + save_name)
 
 
 def two_d_generation_gmsh(self):
     checked_view_list = self.view_scroll_frame.get()
     if len(checked_view_list) > 1:
-        write_to_console_log(self, "MevEGS:\t\tOnly one GMSH view can be checked")
+        write_to_console_log(self, "MEVEGS:\t\tOnly one GMSH view can be checked")
         return
     checked_view = ''.join(checked_view_list)
     view_tag = self.view_dict[checked_view]
@@ -1374,7 +1446,7 @@ def two_d_generation_gmsh(self):
     self.topframe.title('2D Coordinates - ' + checked_view)
     self.topframe.update()
     msh_data = MshResults_io(self.directory_file_project_msh, self.directory_project, self.directory_file_egsinp,
-                             [self.console_text_box_source, self.console_text_box_input, self.console_text_box_1, self.console_text_box_2, self.console_text_box_3])
+                             [self.console_text_box_input, self.console_text_box_1, self.console_text_box_2, self.console_text_box_3])  # self.console_text_box_source,
     msh_data.load_model_information()
     self.lbl_create_figs_tf = ctk.CTkLabel(self.topframe, text="P0: Origin", font=('Helvetica', 16, 'bold'),
                                            justify='center')
@@ -1496,7 +1568,7 @@ def two_d_generate_gmsh_figure(self, msh_data, view_tag, x0, y0, z0, x1, y1, z1,
     if np.abs(pd_plane['X'].max() - pd_plane['X'].min()) and np.abs(
             pd_plane['Y'].max() - pd_plane['Y'].min()) >= np.abs(
             pd_plane['Z'].max() - pd_plane['Z'].min()):
-        print('Plotting: xyz')
+        write_to_console_log(self, 'Plotting: xyz')
         range_x = np.arange(pd_plane['X'].min(), pd_plane['X'].max(),
                             (pd_plane['X'].max() - pd_plane['X'].min()) / int(numpointsu))
         range_y = np.arange(pd_plane['Y'].min(), pd_plane['Y'].max(),
@@ -1522,7 +1594,7 @@ def two_d_generate_gmsh_figure(self, msh_data, view_tag, x0, y0, z0, x1, y1, z1,
     elif np.abs(pd_plane['X'].max() - pd_plane['X'].min()) and np.abs(
             pd_plane['Z'].max() - pd_plane['Z'].min()) >= np.abs(
             pd_plane['Y'].max() - pd_plane['Y'].min()):
-        print('Plotting: xzy')
+        write_to_console_log(self, 'Plotting: xzy')
         range_x = np.arange(pd_plane['X'].min(), pd_plane['X'].max(),
                             (pd_plane['X'].max() - pd_plane['X'].min()) / int(numpointsu))
         range_y = np.arange(pd_plane['Z'].min(), pd_plane['Z'].max(),
@@ -1546,7 +1618,7 @@ def two_d_generate_gmsh_figure(self, msh_data, view_tag, x0, y0, z0, x1, y1, z1,
         ax1.set_ylabel('Projection V')
         ax1.set_xlim(np.max(x_surf + dx_surf / 2), np.min(x_surf + dx_surf / 2))
     else:
-        print('Plotting: yzx')
+        write_to_console_log(self, 'Plotting: yzx')
         range_x = np.arange(pd_plane['Y'].min(), pd_plane['Y'].max(),
                             (pd_plane['Y'].max() - pd_plane['Y'].min()) / int(numpointsu))
         range_y = np.arange(pd_plane['Z'].min(), pd_plane['Z'].max(),
@@ -1592,17 +1664,6 @@ def two_d_generate_gmsh_figure(self, msh_data, view_tag, x0, y0, z0, x1, y1, z1,
 
 
 def color_theme_notice(self):
-    self.topframe = ctk.CTkToplevel(self.gui)
-    self.topframe.grab_set()
-    # self.topframe.geometry("600x700")
-    self.topframe.attributes('-topmost', True)
-    self.topframe.geometry("+0+0")
-    self.topframe.update()
-    self.topframe.focus()
-    self.topframe.title('Notice')
-    self.warning = ctk.CTkLabel(self.topframe, font=("Arial", 20),
-                                text='Please Exit and Restart the MevEGS application\nto initialize this color-theme change')
-    self.warning.grid(column=0, row=0, pady=50, padx=30, columnspan=2, sticky='nsew')
     self.color_theme = ctk.ThemeManager._currently_loaded_theme
     dark_only_themes = ['Greengage', 'Hades', 'Harlequin', 'NightTrain', 'TrojanBlue']
     light_to_dark_trigger = False
@@ -1610,17 +1671,38 @@ def color_theme_notice(self):
         if self.color_theme == _theme:
             if ctk.get_appearance_mode() == 'Light':
                 light_to_dark_trigger = True
-                self.theme_warning = ctk.CTkLabel(self.topframe, font=("Arial", 16),
-                                                  text='The ' + self.color_theme + ' does not support \'Light\' appearance mode\n\'Dark\' mode will be enabled')
-                self.theme_warning.grid(column=0, row=1, pady=5, padx=5, columnspan=2, sticky='nsew')
-    self.restart_button = ctk.CTkButton(master=self.topframe, text='Restart Now', height=50,
-                                        command=lambda: [self.btn_exit_popup(),
-                                                         light_dark_trigger(self, light_to_dark_trigger),
-                                                         restart_app_now(self)])  # ctk.set_appearance_mode('Dark'),
-    self.restart_button.grid(column=0, row=2, pady=50, padx=5, sticky='nesw')
-    self.exit_button = ctk.CTkButton(master=self.topframe, text='Restart Later', height=50,
-                                     command=lambda: [self.btn_exit_popup()])
-    self.exit_button.grid(column=1, row=2, pady=50, padx=5, sticky='nesw')
+    light_dark_trigger(self, light_to_dark_trigger)
+    restart_app_now(self)
+
+    # self.topframe = ctk.CTkToplevel(self.gui)
+    # self.topframe.grab_set()
+    # # self.topframe.geometry("600x700")
+    # self.topframe.attributes('-topmost', True)
+    # self.topframe.geometry("+0+0")
+    # self.topframe.update()
+    # self.topframe.focus()
+    # self.topframe.title('Notice')
+    # self.warning = ctk.CTkLabel(self.topframe, font=("Arial", 20),
+    #                             text='Please Exit and Restart the MEVEGS application\nto initialize this color-theme change')
+    # self.warning.grid(column=0, row=0, pady=50, padx=30, columnspan=2, sticky='nsew')
+    # self.color_theme = ctk.ThemeManager._currently_loaded_theme
+    # dark_only_themes = ['Greengage', 'Hades', 'Harlequin', 'NightTrain', 'TrojanBlue']
+    # light_to_dark_trigger = False
+    # for _theme in dark_only_themes:
+    #     if self.color_theme == _theme:
+    #         if ctk.get_appearance_mode() == 'Light':
+    #             light_to_dark_trigger = True
+    #             self.theme_warning = ctk.CTkLabel(self.topframe, font=("Arial", 16),
+    #                                               text='The ' + self.color_theme + ' does not support \'Light\' appearance mode\n\'Dark\' mode will be enabled')
+    #             self.theme_warning.grid(column=0, row=1, pady=5, padx=5, columnspan=2, sticky='nsew')
+    # self.restart_button = ctk.CTkButton(master=self.topframe, text='Restart Now', height=50,
+    #                                     command=lambda: [self.btn_exit_popup(),
+    #                                                      light_dark_trigger(self, light_to_dark_trigger),
+    #                                                      restart_app_now(self)])  # ctk.set_appearance_mode('Dark'),
+    # self.restart_button.grid(column=0, row=2, pady=50, padx=5, sticky='nesw')
+    # self.exit_button = ctk.CTkButton(master=self.topframe, text='Restart Later', height=50,
+    #                                  command=lambda: [self.btn_exit_popup()])
+    # self.exit_button.grid(column=1, row=2, pady=50, padx=5, sticky='nesw')
 
 
 def light_dark_trigger(self, trigger):
@@ -1633,16 +1715,22 @@ def restart_app_now(self):
     with open(self.directory_ini + '/mevegs_app.ini', 'w', newline='') as myfile:
         w = csv.writer(myfile)
         w.writerows(save_dict.items())
-    # command = "python MevEGS_gui.py"
+    # command = "python MEVEGS_ui.py"
     self.gui.update_idletasks()
-    self.gui.quit()
-    self.gui.destroy()
-    for after_id in self.gui.tk.eval('after info').split():  # Allows program to end by catching many of the 'after'
-        self.gui.after_cancel(after_id)  # commands that CTk runs behind scenes
     os.chdir(self.directory_ini)
-    #  Need a process here to close the old python window, which doesn't close on repeated
-    subprocess.Popen(str("cmd python /k " + self.directory_ini + "MevEGS_gui.py"))
-
+    os.chdir("..")
+    if os.path.isfile(os.getcwd() + '\MEVEGS_ui.exe'):
+        os.system('start ' + os.getcwd() + '\MEVEGS_ui.exe')
+        sys.exit()
+        # subprocess.call([str(os.path.dirname(self.directory_ini) + 'MEVEGS_gui.exe')])
+    else:
+        os.chdir(self.directory_ini)
+        self.gui.quit()
+        self.gui.destroy()
+        for after_id in self.gui.tk.eval('after info').split():  # Allows program to end by catching many of the 'after'
+            self.gui.after_cancel(after_id)  # commands that CTk runs behind scenes
+        subprocess.Popen(str("cmd python /k " + self.directory_ini + "MEVEGS_ui.py"))
+        # Need a process here to close the old python window, which doesn't close on repeated relaunches
 
 def save_project(self):
     self.topframe = ctk.CTkToplevel(self.gui)  # , fg_color="indian red")
@@ -1680,12 +1768,10 @@ def restore_defaults(self):
     self.directory_file_project_msh = 'Choose .results.msh File'
     self.gmsh_views = ''
     self.gmsh_groups = ''
-    self.directory_source = ''
-    self.file_source = ''
+    # self.file_source = ''
     self.bar_progress = 0
     self.quit_progress_bar = False
     self.menu_data = ''
-    self.menu_source = ''
     self.view_dict = {}
 
     self.btn_egsinp_explore.configure(text=self.directory_file_egsinp)
@@ -1693,8 +1779,8 @@ def restore_defaults(self):
     self.btn_project_explore.configure(text=self.directory_project)
     self.job_number.set(self.njobs)
     self.btn_results_mesh_explore.configure(text=os.path.basename(self.directory_file_project_msh))
-    self.gui.title('MevEGS - New Project')
-    write_to_console_log(self, 'MevEGS:\t\tNew project started')
+    self.gui.title('MEVEGS - New Project')
+    write_to_console_log(self, 'MEVEGS:\t\tNew project started')
     self.gui.update_idletasks()
     return self.directory_file_egsinp, self.directory_file_msh, self.directory_project, self.directory_file_project_msh
 
@@ -1703,7 +1789,7 @@ def create_hover_tooltips(self):
     self.drop_menu_relaunch_tip = CTkToolTip(self.menu_bar_relaunch, delay=0.1,
                                              message="Relaunches app after error (will quick-save inputs)")
     # CST source Tab
-    self.btn_cst_file_explore_tip = CTkToolTip(self.btn_cst_file_explore, delay=0.1, message=self.directory_file_cst_source)
+    # self.btn_cst_file_explore_tip = CTkToolTip(self.btn_cst_file_explore, delay=0.1, message=self.directory_file_cst_source)
     # Input Tab
     self.btn_project_explore_tip = CTkToolTip(self.btn_project_explore, delay=0.1, message=self.directory_project + '\n'
                                                                                             'One simulation per project folder\n'
@@ -1714,41 +1800,43 @@ def create_hover_tooltips(self):
     self.btn_mesh_explore_tip = CTkToolTip(self.btn_mesh_explore, delay=0.1, message=self.directory_file_msh)
     self.btn_results_mesh_explore_tip = CTkToolTip(self.btn_results_mesh_explore, delay=0.1,
                                                    message=self.directory_file_project_msh)
-    self.menu_source_1_tip = CTkToolTip(self.menu_source_1, delay=0.1,
-                                        message=self.directory_ini + 'Source_Phasespace_Files/')
-    self.btn_mevegs_explore_tip = CTkToolTip(self.btn_mevegs_explore, delay=0.1, message=self.directory_mevegs)
-    self.btn_pegs_explore_tip = CTkToolTip(self.btn_pegs_explore, delay=0.1, message=self.directory_file_pegs)
-    self.btn_postpro_explore_tip = CTkToolTip(self.btn_postpro_explore, delay=0.1, message=self.directory_post_pro)
-    self.btn_cluster_explore_tip = CTkToolTip(self.btn_cluster_explore, delay=0.1, message=self.directory_ini)
+    # self.btn_mevegs_explore_tip = CTkToolTip(self.btn_mevegs_explore, delay=0.1, message=self.directory_mevegs)
+    # self.btn_pegs_explore_tip = CTkToolTip(self.btn_pegs_explore, delay=0.1, message=self.directory_file_pegs)
+    # self.btn_cluster_explore_tip = CTkToolTip(self.btn_cluster_explore, delay=0.1, message=self.directory_ini)
     self.btn_egsinp_file_open_tip = CTkToolTip(self.btn_egsinp_file_open, delay=0.1, message='Open file location')
     self.btn_msh_file_open_tip = CTkToolTip(self.btn_msh_file_open, delay=0.1, message='Open file location')
     self.btn_project_msh_file_open_tip = CTkToolTip(self.btn_project_msh_file_open, delay=0.1, message='Open file location')
     # Simulate Tab
     self.btn_ptracks_tip = CTkToolTip(self.btn_ptracks, delay=0.1,
-                                      message="Run a shortened MevEGS simulation to verify\n"
+                                      message="Run a shortened MEVEGS simulation to verify\n"
                                               "source location relative to geometry")
+    self.btn_show_ptracks_tip = CTkToolTip(self.btn_show_ptracks, delay=0.1,
+                                      message="Launch gmsh to show source location relative to geometry")
     self.btn_run_mevegs_tip = CTkToolTip(self.btn_run_mevegs, delay=0.1,
-                                         message="Run MevEGS simulation with the\n"
+                                         message="Run MEVEGS simulation with the\n"
                                                  "the dedicated number of CPUs")
-    self.btn_show_mevegs_progressbar_tip = CTkToolTip(self.btn_show_mevegs_progressbar, delay=0.1,
-                                                      message="Select this after "
-                                                              "initiating a local MevEGS simulation")
+    # self.btn_show_mevegs_progressbar_tip = CTkToolTip(self.btn_show_mevegs_progressbar, delay=0.1,
+    #                                                   message="Select this after "
+    #                                                           "initiating a local MEVEGS simulation if "
+    #                                                           "it doesn't start on its own")
     self.btn_show_mevegs_jobs_tip = CTkToolTip(self.btn_show_mevegs_jobs, delay=0.1,
-                                               message="Queries Windows processes for MevEGS.exe")
+                                               message="Queries Windows processes for MEVEGS.exe")
     self.btn_clean_up_tip = CTkToolTip(self.btn_clean_up, delay=0.1,
                                        message="Consolidates all project files in project\n"
                                                "folder after a successful simulation")
+    self.btn_load_project_tip = CTkToolTip(self.btn_load_project, delay=0.1,
+                                       message="Load recently completed project with results files")
     self.btn_kill_mevegs_tip = CTkToolTip(self.btn_kill_mevegs, delay=0.1,
-                                          message="Stops all Windows processes (MevEGS.exe)")
+                                          message="Stops all Windows processes (MEVEGS.exe)")
     self.btn_restore_mevegs_tip = CTkToolTip(self.btn_restore_mevegs, delay=0.1,
-                                             message="Returns MevEGS HOME directory to default after\n "
+                                             message="Returns MEVEGS HOME directory to default after\n "
                                                      "an error or aborted simulation")
     self.entry_njobs_tip = CTkToolTip(self.entry_njobs, delay=0.1, message="Should be a divisor of \'ncase\' "
                                                                            "located in the .egsinp file")
     # Cluster Tab
     self.btn_submit_2_tip = CTkToolTip(self.btn_submit_2, delay=0.1, message="SSH to Jericho and submit job files")
     self.btn_check_cluster_2_tip = CTkToolTip(self.btn_check_cluster_2, delay=0.1, message="Initiates cluster-side htopmon to check Jericho core usage")
-    self.optionmenu_user_2_tip = CTkToolTip(self.optionmenu_user_2, delay=0.1, message="Username for SSH login to Jericho")
+    # self.username_tip = CTkToolTip(self.username, delay=0.1, message="Username for SSH login to Jericho")
     self.btn_display_job_progress_2_tip = CTkToolTip(self.btn_display_job_progress_2, delay=0.1, message="Displays progress of *_w1.egslog file")
     self.btn_display_cluster_status_2_tip = CTkToolTip(self.btn_display_cluster_status_2, delay=0.1, message="Displays Jericho job-controller job queue")
     self.btn_show_job_list_2_tip = CTkToolTip(self.btn_show_job_list_2, delay=0.1, message="Displays job IDs of jobs "
@@ -1767,8 +1855,8 @@ def create_hover_tooltips(self):
     self.btn_generate_views_3_tip = CTkToolTip(self.btn_generate_views_3, delay=0.1, message="Opens window to create views not included above")
     self.btn_export_views_3_tip = CTkToolTip(self.btn_export_views_3, delay=0.1, message="Opens window to export data in .csv format")
     self.menu_data_3_tip = CTkToolTip(self.menu_data_3, delay=0.1, message="Contains exported .csv files\nassociated with this project")
-    self.btn_create_1d_ex_tip = CTkToolTip(self.btn_create_1d_ex, delay=0.1, message="Opens window to define line geometry\nthrough chosen exported data")
-    self.btn_create_2d_ex_tip = CTkToolTip(self.btn_create_2d_ex, delay=0.1, message="Opens window to define plane geometry\nthrough chosen exported data")
+    self.btn_create_1d_ex_tip = CTkToolTip(self.btn_create_1d_ex, delay=0.1, message="UNDER CONSTRUCTION\nOpens window to define line geometry\nthrough chosen exported data")
+    self.btn_create_2d_ex_tip = CTkToolTip(self.btn_create_2d_ex, delay=0.1, message="UNDER CONSTRUCTION\nOpens window to define plane geometry\nthrough chosen exported data")
     self.btn_create_1d_tip = CTkToolTip(self.btn_create_1d, delay=0.1, message="Opens window to define line geometry\nthrough chosen GMSH view")
     self.btn_create_2d_tip = CTkToolTip(self.btn_create_2d, delay=0.1, message="Opens window to define plane geometry\nthrough chosen GMSH view")
 
@@ -1776,8 +1864,8 @@ def update_hover_tooltips(self):
     # Menu Bar
     self.drop_menu_relaunch_tip.configure(message="Relaunches app after error (will quick-save inputs)")
     # CST source Tab
-    self.btn_cst_file_explore_tip = CTkToolTip(self.btn_cst_file_explore, delay=0.1,
-                                                message=self.directory_file_cst_source)
+    # self.btn_cst_file_explore_tip = CTkToolTip(self.btn_cst_file_explore, delay=0.1,
+    #                                             message=self.directory_file_cst_source)
     # Input Tab
     self.btn_project_explore_tip.configure(message=self.directory_project + '\nOne simulation per project folder\n'
                                                                             'A main project folder can have many subfolders')
@@ -1786,28 +1874,29 @@ def update_hover_tooltips(self):
     self.btn_egsinp_build_tip.configure(message='Under development')
     self.btn_mesh_explore_tip.configure(message=self.directory_file_msh)
     self.btn_results_mesh_explore_tip.configure(message=self.directory_file_project_msh)
-    self.menu_source_1_tip.configure(message=self.directory_ini + 'Source_Phasespace_Files/')
-    self.btn_mevegs_explore_tip.configure(message=self.directory_mevegs)
-    self.btn_pegs_explore_tip.configure(message=self.directory_file_pegs)
-    self.btn_postpro_explore_tip.configure(message=self.directory_post_pro)
-    self.btn_cluster_explore_tip.configure(message=self.directory_ini)
+    # self.btn_mevegs_explore_tip.configure(message=self.directory_mevegs)
+    # self.btn_pegs_explore_tip.configure(message=self.directory_file_pegs)
+    # self.btn_cluster_explore_tip.configure(message=self.directory_ini)
     # Simulate Tab
-    self.btn_ptracks_tip.configure(message="Run a shortened MevEGS simulation to verify\n"
+    self.btn_ptracks_tip.configure(message="Run a shortened MEVEGS simulation to verify\n"
                                            "source location relative to geometry")
-    self.btn_run_mevegs_tip.configure(message="Run MevEGS simulation with the\nthe dedicated number of CPUs")
-    self.btn_show_mevegs_progressbar_tip.configure(message="Select this after initiating a local MevEGS simulation")
-    self.btn_show_mevegs_jobs_tip.configure(message="Queries Windows processes for MevEGS.exe")
+    self.btn_show_ptracks_tip.configure(message="Launch gmsh to show source location relative to geometry")
+    self.btn_run_mevegs_tip.configure(message="Run MEVEGS simulation with the\nthe dedicated number of CPUs")
+    # self.btn_show_mevegs_progressbar_tip.configure(message="Select this after initiating a local MEVEGS simulation if "
+    #                                                           "it doesn't start on its own")
+    self.btn_show_mevegs_jobs_tip.configure(message="Queries Windows processes for MEVEGS.exe")
     self.btn_clean_up_tip.configure(message="Consolidates all project files in project\n"
                                             "folder after a successful simulation")
-    self.btn_kill_mevegs_tip.configure(message="Stops all Windows processes (MevEGS.exe)")
-    self.btn_restore_mevegs_tip.configure(message="Returns MevEGS HOME directory to default after\n "
+    self.btn_load_project_tip.configure(message="Load recently completed project with results files")
+    self.btn_kill_mevegs_tip.configure(message="Stops all Windows processes (MEVEGS.exe)")
+    self.btn_restore_mevegs_tip.configure(message="Returns MEVEGS HOME directory to default after\n "
                                                   "an error or aborted simulation")
     self.entry_njobs_tip.configure(message="Should be a divisor of \'ncase\' "
                                                                            "located in the .egsinp file")
     # Cluster Tab
     self.btn_submit_2_tip.configure(message="SSH to Jericho and submit job files")
     self.btn_check_cluster_2_tip.configure(message="Initiates cluster-side htopmon to check Jericho core usage")
-    self.optionmenu_user_2_tip.configure(message="Username for SSH login to Jericho")
+    # self.username_tip.configure(message="Username for SSH login to Jericho")
     self.btn_display_job_progress_2_tip.configure(message="Displays progress of *_w1.egslog file")
     self.btn_display_cluster_status_2_tip.configure(message="Displays Jericho job-controller job queue")
     self.btn_show_job_list_2_tip.configure(message="Displays job IDs of jobs submitted:\nqueued, "
@@ -1818,16 +1907,18 @@ def update_hover_tooltips(self):
     self.btn_results_retrieve_2_tip.configure(message="Open directory " + self.directory_project)
     self.btn_process_phasespace_2_tip.configure(message="Uses beamdp.bat (option 11) to convert files to human-readable")
     self.lbl_results_header_3_tip.configure(message="Displays current .results.msh file")
-    self.btn_load_gmshviews_3_tip.configure(message="Button may not be necessary...")
+    self.btn_load_gmshviews_3_tip.configure(message="Refresh list of views in current project")
     self.btn_generate_views_3_tip.configure(message="Opens window to create views not included above")
     self.btn_export_views_3_tip.configure(message="Opens window to export data in .csv format")
     self.menu_data_3_tip.configure(message="Contains exported .csv files\nassociated with this project")
-    self.btn_create_1d_ex_tip.configure(message="Opens window to define line geometry\nthrough chosen exported data")
-    self.btn_create_2d_ex_tip.configure(message="Opens window to define plane geometry\nthrough chosen exported data")
+    self.btn_create_1d_ex_tip.configure(message="UNDER CONSTRUCTION\nOpens window to define line geometry\nthrough chosen exported data")
+    self.btn_create_2d_ex_tip.configure(message="UNDER CONSTRUCTION\nOpens window to define plane geometry\nthrough chosen exported data")
     self.btn_create_1d_tip.configure(message="Opens window to define line geometry\nthrough chosen GMSH view")
     self.btn_create_2d_tip.configure(message="Opens window to define plane geometry\nthrough chosen GMSH view")
 
 def update_phasespace_warning_label(self):
+    self.btn_results_retrieve_2.configure(text='Open directory\n' +
+                                               os.path.basename(os.path.dirname(self.directory_project)))
     self.phasespace_warning_2.configure(text='\'Retrieve all\' downloads all available\n'
                                              'simulations to sub-folders of your\n'
                                              'project with four digit folder names\n   /'
@@ -1838,6 +1929,76 @@ def update_phasespace_warning_label(self):
                                                'correct directory before processing\n'
                                                'phase-space files and using the\n'
                                                '\'Post Process\' tab')
+
+def initial_configuration(self):
+    self.topframe = ctk.CTkToplevel(self.gui)  # , fg_color="steel blue"
+    self.topframe.grab_set()
+    # self.topframe.geometry("700x300")
+    self.topframe.attributes('-topmost', True)
+    self.topframe.update()
+    self.topframe.focus()
+    self.topframe.title('Initial Configuration Wizard')
+    self.topframe.grid_columnconfigure(0, weight=1)
+    self.topframe.grid_columnconfigure(1, weight=1)
+    self.topframe.grid_columnconfigure(2, weight=1)
+    self.topframe.grid_rowconfigure(0, weight=1)
+    self.topframe.grid_rowconfigure(1, weight=1)
+    self.warning = ctk.CTkLabel(self.topframe, font=("Arial", 20),
+                                text='Configuration')
+    self.warning.grid(column=0, row=0, pady=10, padx=10, columnspan=3, sticky='nsew')
+    self.lbl_mevegs = ctk.CTkLabel(self.topframe, text="EGS_HOME/mevegs/mevegs.cpp location")
+    self.lbl_mevegs.grid(column=0, row=1, padx=5, pady=2, sticky='e')
+    self.btn_mevegs_explore = ctk.CTkButton(self.topframe, text=self.directory_mevegs,
+                                            command=self.btn_mevegs_explore_clicked)
+    self.btn_mevegs_explore.grid(column=1, row=1, padx=5, pady=2, sticky='we', columnspan=2)
+    self.lbl_pegs = ctk.CTkLabel(self.topframe, text='.pegs4dat file location')
+    self.lbl_pegs.grid(column=0, row=2, padx=5, pady=2, sticky='e')
+    self.btn_pegs_explore = ctk.CTkButton(self.topframe, text=self.directory_file_pegs,
+                                          command=self.btn_pegs_explore_clicked)
+    self.btn_pegs_explore.grid(column=1, row=2, padx=5, pady=2, sticky='we', columnspan=2)
+    self.lbl_username_2 = ctk.CTkLabel(self.topframe, text="Cluster Username [3 letters]")
+    self.lbl_username_2.grid(column=0, row=3, padx=5, pady=2, sticky='e')
+
+    # string_variable = ctk.StringVar()
+    # self.cluster_user_2 = ctk.CTkEntry(self.topframe, textvariable=string_variable)
+    # self.cluster_user_2.grid(column=1, row=3, padx=5, pady=2, sticky='we')
+    # string_variable = self.username
+    # self.cluster_user_2.configure(textvariable=self.username)
+
+    self.set_username = ctk.CTkComboBox(self.topframe, values=[self.username], justify='center')
+    self.set_username.grid(column=1, row=3, padx=5, pady=2, sticky='we')
+    self.set_username['state'] = 'normal'
+
+    self.lbl_ini = ctk.CTkLabel(self.topframe, text="MEVEGS UI location")
+    self.lbl_ini.grid(column=0, row=4, padx=5, pady=2, sticky='e')
+    self.lbl_cluster_explore = ctk.CTkLabel(self.topframe, text=self.directory_ini)
+    self.lbl_cluster_explore.grid(column=1, row=4, padx=5, pady=2, sticky='we', columnspan=2)
+    self.exit_button = ctk.CTkButton(master=self.topframe, text='Save and Exit',
+                                     command=lambda: [set_initial_configuration(self), self.btn_exit_popup()])
+    self.exit_button.grid(column=1, row=8, pady=10, padx=10, sticky='nesw')
+
+def set_initial_configuration(self):
+    self.username = self.set_username.get()
+    if self.username.startswith('Choose'):
+        return
+    else:
+        initialize_bat_files(self, self.directory_ini + 'local_job_submission_phasespace.bat', self.username)
+        initialize_bat_files(self, self.directory_ini + 'local_job_retrieve.bat', self.username)
+        initialize_bat_files(self, self.directory_ini + 'cluster_perf_mon_htop.bat', self.username)
+
+def initialize_bat_files(self, file, username):
+    with open(file, "r") as f:
+        old_text = f.readlines()
+    new_text = []
+    for line in old_text:
+        if 'MDE' in line:
+            new_line = line.replace('MDE', username)
+            new_text.append(new_line)
+        else:
+            new_text.append(line)
+    with open(file, "w") as f:
+        for line in new_text:
+            f.write(line)
 
 def one_d_generation_export(self):
     file_name = self.menu_data_3.get()

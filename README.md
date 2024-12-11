@@ -52,5 +52,7 @@ NOTES
 
     * .egsinp file:
         scaling = ## line can't have any '#' comment after the factor
-    * Phasespace handling is broken AFAIK
+
+    * https://gitlab.onelab.info/gmsh/gmsh/-/issues/1142
+        - gmsh overwrites/messes with the local %PATH% environment variables... causing havoc. This link describes how to solve that issue
 '''

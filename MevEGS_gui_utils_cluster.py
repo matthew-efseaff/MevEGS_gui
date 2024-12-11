@@ -2,6 +2,7 @@
 # coding: utf-8
 
 import os
+import re
 import shutil
 import time
 import subprocess
@@ -15,42 +16,44 @@ def btn_submit_cluster_jobs_clicked(self):
     _, file_egsinp = os.path.split(self.directory_file_egsinp)
     shutil.copy2(self.directory_file_msh, self.directory_ini)
     _, file_msh = os.path.split(self.directory_file_msh)
+    # Below code reads egsinp to find 'phase space file'. This file then must be in the project directory with the egsinp so that it can be copied to the mevegs 'home'/cluster for simulation
+    source_file = str()
+    phase_space_file_check = str()
+    stripped_source_file = str()
+    with open(self.directory_file_egsinp, "r") as f:
+        for line in f:
+            if re.search('phase space file', line):
+                phase_space_file_check = line
+                source_file = line.split('=')[1]
+                stripped_source_file = source_file.strip()
+                break
+    if phase_space_file_check and source_file == '':
+        utils.write_to_console_log(self,
+                                   'Either the phase space source file is not in the project directory,'
+                                   ' or the phase space file does not follow the convention: '
+                                   'phase space file = filename.egsphsp1.txt or filename.txt')
+    if stripped_source_file and phase_space_file_check:
+        if not os.path.isfile(self.directory_project + stripped_source_file):
+            utils.write_to_console_log(self,
+                                       'Phase space source requested in .egsinp file is not in project directory')
+    if os.path.isfile(self.directory_project + stripped_source_file):
+        shutil.copy2(self.directory_project + stripped_source_file, self.directory_ini)
+    elif not phase_space_file_check:
+        utils.write_to_console_log(self, 'No phase space source requested in .egsinp file')
+    time.sleep(3)  # to let things copy... big things
     os.chdir(self.directory_ini)
-    file_source = self.menu_source_1.get()
-    if file_source in ('', 'Choose source', 'None', 'NaN'):
+
+    if not os.path.isfile(self.directory_ini + stripped_source_file):
         command = 'local_job_submission_phasespace ' + file_egsinp + ' ' + file_msh
     else:
-        shutil.copy2(self.directory_ini + 'Source_Phasespace_Files/' + self.menu_source_1.get(), self.directory_ini)
-        _, file_source = os.path.split(self.directory_ini + self.menu_source_1.get())
+        _, file_source = os.path.split(self.directory_ini + stripped_source_file)
         command = 'local_job_submission_phasespace ' + file_egsinp + ' ' + file_msh + ' ' + file_source
     job_file_name = 'mevegs_cluster_console_output_1.mvgs'
-    if os.path.isfile(self.directory_ini + self.menu_source_1.get()):
-        utils.write_to_console_log(self, "Mevegs:\t\tPhase-space file: " + str(self.directory_ini + self.menu_source_1.get()) + " included")
     with open(job_file_name, "w") as f:
         process = subprocess.Popen(['cmd', '/c', command], stdout=f, stderr=subprocess.STDOUT, bufsize=0)
     while process.poll() is None:
-        utils.write_to_console_log(self, 'MevEGS:\t\tSending job to cluster')
+        utils.write_to_console_log(self, 'MEVEGS:\t\tSending job to cluster')
         time.sleep(5)
-    # launch performance monitor
-    # if os.path.isfile(self.directory_ini + 'cluster_perf_mon_htop.bat'):
-    #     subprocess.Popen(['cmd', '/c', 'cluster_perf_mon_htop.bat'])
-    # time.sleep(2)
-
-    # rename, read console output
-    # try:
-    #     f_ = open(self.directory_ini + job_file_name, 'r')
-    #     last_lines = f_.readlines()[-1]
-    #     job_id = last_lines.split(' ')[-1].split('\n')[0]
-    #     f_.close()
-    # except IndexError:
-    #     time.sleep(5)
-    # try:
-    #     f_ = open(self.directory_ini + job_file_name, 'r')
-    #     last_lines = f_.readlines()[-1]
-    #     job_id = last_lines.split(' ')[-1].split('\n')[0]
-    #     f_.close()
-    # except IndexError:
-    #     time.sleep(5)
     f_ = open(self.directory_ini + job_file_name, 'r')
     last_lines = f_.readlines()[-1]
     job_id = last_lines.split(' ')[-1].split('\n')[0]
@@ -66,8 +69,9 @@ def btn_submit_cluster_jobs_clicked(self):
     if os.path.isfile(self.directory_ini + file_source):
         os.remove(self.directory_ini + file_source)
     btn_show_job_list_clicked_2(self)
-    if self.optionmenu_user_2.get() != 'Choose':
-        btn_display_cluster_status_clicked_2(self, self.optionmenu_user_2.get())
+    if self.username != 'Choose':
+        btn_display_cluster_status_clicked_2(self, self.username)
+    os.chdir(self.directory_ini)
 
 
 def btn_check_cluster_status_clicked(self):
@@ -102,37 +106,37 @@ def btn_retrieve_cluster_jobs_clicked(self):
 
 def process_cluster_phase_space(self):
     os.makedirs(self.directory_project + 'phase_space_files/', exist_ok=True)
-    directory_project = self.directory_project + 'phase_space_files/'
     phsp_filenames = []
-    for fname in os.listdir(self.directory_project):  # gets list of filenames
+    for fname in os.listdir(self.directory_project):
         if '.egsphsp1' in fname:
             phsp_filenames.append(os.path.basename(fname).split('.egsphsp1')[0])
-    print(phsp_filenames)
-    egsphsp1_file_names = glob.glob(self.directory_project + '*egsphsp1', recursive=False)
-    print(egsphsp1_file_names)
-    for object_ in egsphsp1_file_names:
-        if os.path.isfile(object_):
-            shutil.copy2(object_, directory_project)
-    shutil.copy2(self.directory_post_pro + 'beamdp.bat', directory_project)
-    if os.path.isfile(directory_project + 'beamdp.bat'):
-        print(directory_project + 'beamdp.bat')
-    else:
-        print('no beamdp.bat in directory')
+    # print(phsp_filenames)
+    process_cluster_human_phase_space_files(self, phsp_filenames)
+
+
+def process_cluster_human_phase_space_files(self, phsp_filenames):
+    os.chdir(self.directory_project + 'phase_space_files/')
+    utils.write_to_console_log(self, "MEVEGS:\t\tPreparing human readable phase space files...")
+    # Convert to human-readable, hardcoded beamdp option 11
+    # move beamdp.bat to working dir
+    shutil.copy2(self.directory_ini + 'beamdp.bat', self.directory_project + 'phase_space_files/')
+    for file in phsp_filenames:
+        shutil.move(self.directory_project + file + '.egsphsp1', self.directory_project + 'phase_space_files/')
     progress_read = []
-    os.chdir(directory_project)
-    print(os.getcwd())
     for j in range(len(phsp_filenames)):
         command = 'beamdp.bat ' + phsp_filenames[j] + '.egsphsp1'
-        print(command)
-        progress_read.append(subprocess.Popen(['cmd', '/c', command]))
-    time.sleep(5)
+        error_file_name = phsp_filenames[j] + '_console_log.mvgs'
+        with open(error_file_name, 'w') as f:
+            progress_read.append(
+                subprocess.Popen(['cmd', '/c', command], stdout=f, stderr=subprocess.STDOUT, bufsize=0))
     for i in range(len(phsp_filenames)):
         while progress_read[i].poll() is None:
-            utils.write_to_console_log(self, "MevEGS:\t\tPreparing human readable phase space files " + str(i + 1) + '...')
-            time.sleep(10)
-    utils.write_to_console_log(self, "MevEGS:\t\tReadable particle phase space files saved in: " + directory_project)
-    # os.remove(directory_project + 'beamdp.bat')
-    os.chdir(self.directory_mevegs)  # back to mevegs home
+            time.sleep(5)
+            utils.write_to_console_log(self, "MEVEGS:\t\tPreparing human readable phase space files " + str(i + 1) + '...')
+    utils.write_to_console_log(self, "MEVEGS:\t\tReadable particle phase space files saved in: " + self.directory_project + 'phase_space_files/')
+    # delete beamdp.bat
+    os.remove(self.directory_project + 'phase_space_files/beamdp.bat')
+    os.chdir(self.directory_ini)  # back to home
 
 
 def btn_kill_cluster_jobs_clicked(self, username, job_id):
@@ -140,7 +144,7 @@ def btn_kill_cluster_jobs_clicked(self, username, job_id):
     cmd1 = str("ssh " + username + "@jericho-jobctrl.mevex.local scancel " + job_id)
     if username == 'Choose' or job_id == 'Job number' or job_id == 'None':
         display_queue = 'Missing Job number or username'
-        utils.write_to_console_log(self, 'MevEGS:\t\t' + display_queue)
+        utils.write_to_console_log(self, 'MEVEGS:\t\t' + display_queue)
         # self.lbl_display_queue_2.configure(text=display_queue)
         self.frame_2.update_idletasks()
         return
@@ -223,7 +227,7 @@ def btn_display_cluster_log_file_clicked_2(self, username):
         else:
             log = 'Cluster:\t\tThe ' + file_egsinp + ' job is not in progress. It may not have started or it may be complete'
     else:
-        log = 'Cluster:\t\tChoose cluster username'
+        log = 'Cluster:\t\tChoose cluster username [File menu, Initial configuration wizard]'
     # self.lbl_display_queue_2.configure(text=log)
     utils.write_to_console_log(self, log)
     utils.write_to_console_log(self, 'Cluster:\t\tProgress output from _w1.egslog file')

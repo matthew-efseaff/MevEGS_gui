@@ -12,6 +12,7 @@
 #
 
 import csv
+import sys
 import glob
 import os
 import re
@@ -26,15 +27,16 @@ import customtkinter as ctk
 import MevEGS_gui_utils as utils
 import MevEGS_gui_utils_cluster as cluster
 import Scanned_beam_source_creator as sbsc
-from Post_Processing import ptracks as pt
+import ptracks as pt
 import posixpath
 from CTkMenuBar import *  # import CTkMenuBar
 from CTkXYFrame import *
+# from PIL import ImageTk
 from CTkTable import *
 
-# import matplotlib.pyplot as plt
-# import tkinter as tk
-# import numpy as np
+# PYI_Splash image-ing
+if getattr(sys, 'frozen', False):
+    import pyi_splash
 
 # --------------------------------------------------------------------------------------------
 
@@ -42,9 +44,9 @@ from CTkTable import *
 
 # main class
 class MevegsGui:
+    version = 'Version 1.0.0'
     directory_ini = 'Error - not initialized'
-    directory_mevegs = 'Choose MevEGS Home Directory'
-    directory_post_pro = 'Choose Post Processing Script Directory'
+    directory_mevegs = 'Choose MEVEGS Home Directory'
     directory_file_egsinp = 'Choose .egsinp File'
     directory_file_msh = 'Choose .msh File'
     directory_file_pegs = 'Choose .pegs File'
@@ -53,22 +55,19 @@ class MevegsGui:
     directory_file_project_msh = 'Choose .results.msh File'
     gmsh_views = ''
     gmsh_groups = ''
-    directory_source = ''
-    file_source = ''
     bar_progress = 0
     quit_progress_bar = False
     menu_data = ''
-    menu_source = ''
     view_dict = {}
     appearance = ''
     color_theme = ''
     scaling = ''
-    username = ''
+    username = 'Choose'
     directory_file_cst_source = 'Choose CST Source File'
     dataframe_cst_file = ''
 
-    # IF RUN BY COMMAND LINE like >python 'mevegs_gui_program_name.py'
-    # Below saves an initialization file to the location of this MevEGS app .py file
+    # IF RUN BY COMMAND LINE like >python 'mevegs_ui_program_name.py'
+    # Below saves an initialization file to the location of this MEVEGS app .py file
     # directory_ini    = os.path.dirname(os.path.realpath(__file__))
     # IF RUN BY INTERPRETER (PyCharm, Jupyter, etc.)
     # directory_ini    = os.getcwd()       #  This might work for both situations, but using __file__ seems Pythonic
@@ -88,7 +87,7 @@ class MevegsGui:
         ctk.set_window_scaling(1.75)  # temporary until we figure out the scaling/screen view best fit
         # ctk.set_widget_scaling(1.1)
         self.gui = gui
-        self.gui.title("MevEGS")
+        self.gui.title("MEVEGS")
         looks_saved_info_dict = {}
         if os.path.isfile(self.directory_ini + '/mevegs_app.ini'):
             pd_dataframe = pd.read_csv(self.directory_ini + '/mevegs_app.ini', header=None)
@@ -110,13 +109,16 @@ class MevegsGui:
         self.menu_bar = CTkMenuBar(self.gui)
         self.menu_bar_file = self.menu_bar.add_cascade(text="File")
         self.menu_bar_settings = self.menu_bar.add_cascade(text='Settings')
+        self.menu_bar_about = self.menu_bar.add_cascade(text='About')
         self.menu_bar_relaunch = self.menu_bar.add_cascade(text='Relaunch app')
 
         self.drop_menu_file = CustomDropdownMenu(widget=self.menu_bar_file)
         self.drop_menu_file.add_option(option='Quick Save', command=lambda: self.quick_save())
         self.drop_menu_file.add_option(option='Save As', command=lambda: self.btn_save_state_clicked())
-        self.drop_menu_file.add_option(option='Load', command=lambda: self.btn_load_state_clicked())
+        self.drop_menu_file.add_option(option='Load Saved Project', command=lambda: self.btn_load_state_clicked())
         self.drop_menu_file.add_option(option='New Project', command=lambda: [utils.save_project(self)])
+        self.drop_menu_file.add_separator()
+        self.drop_menu_file.add_option(option='Initial configuration wizard', command=lambda: [utils.initial_configuration(self)])
         self.drop_menu_file.add_separator()
         self.drop_menu_file.add_option(option='Exit', command=lambda: self.btn_exit_program())
         self.drop_menu_file.add_separator()
@@ -126,7 +128,7 @@ class MevegsGui:
         self.drop_menu_settings = CustomDropdownMenu(widget=self.menu_bar_settings)
         self.drop_menu_settings.add_option(option='Full Screen (toggle)',
                                            command=lambda: utils.menu_full_screen_clicked(self))
-        self.sub_drop_scaling = self.drop_menu_settings.add_submenu("GUI Scaling")
+        self.sub_drop_scaling = self.drop_menu_settings.add_submenu("UI Scaling")
         self.sub_drop_scaling.add_option(option="75% ", command=lambda: [ctk.set_widget_scaling(0.75),
                                                                          utils.write_to_console_log(self, 
                                                                              "Widget scaling:\t\t0.75")])  # ctk.set_window_scaling(0.75),
@@ -174,18 +176,20 @@ class MevegsGui:
                                                                              utils.color_theme_notice(self)])
         self.sub_drop_theme.add_option(option="TrojanBlue", command=lambda: [ctk.set_default_color_theme("TrojanBlue"),
                                                                              utils.color_theme_notice(self)])
+        self.drop_menu_about = CustomDropdownMenu(widget=self.menu_bar_about)
+        self.drop_menu_about.add_option(option=self.version)
         self.menu_bar_relaunch.configure(command=lambda: utils.restart_app_now(self))
 
         self.tabview = ctk.CTkTabview(master=gui, anchor='nw', command=self.btn_update_tabs)
         self.tabview.pack()
-        self.tab_create_s = self.tabview.add('Create Source')
-        self.tab_create_s.grid_columnconfigure(0, weight=1)
+        # self.tab_create_s = self.tabview.add('Create Source')
+        # self.tab_create_s.grid_columnconfigure(0, weight=1)
         self.tab_inputs = self.tabview.add('Source Files')
         self.tab_inputs.grid_columnconfigure(0, weight=1)
-        self.tab_1 = self.tabview.add('Simulate')
+        self.tab_1 = self.tabview.add('Local Sim')
         self.tab_1.grid_columnconfigure(0, weight=1)
         self.tab_1.grid_rowconfigure(0, weight=1)
-        self.tab_2 = self.tabview.add('Cluster')
+        self.tab_2 = self.tabview.add('Cluster Sim')
         self.tab_2.grid_columnconfigure(0, weight=1)
         self.tab_2.grid_rowconfigure(0, weight=1)
         self.tab_3 = self.tabview.add('Post Process')
@@ -203,9 +207,9 @@ class MevegsGui:
         # SOURCE FILES TAB INPUT
         window_height = 0.815
         window_width = 0.975
-        self.frame_create_s = CTkXYFrame(self.tab_create_s, width=window_width * scale_factor * size_tuple[1],
-                                       height=window_height * scale_factor * size_tuple[0], scrollbar_width=20)
-        self.frame_create_s.grid(row=0, column=0, pady=4, padx=4, sticky='nesw')
+        # self.frame_create_s = CTkXYFrame(self.tab_create_s, width=window_width * scale_factor * size_tuple[1],
+        #                                height=window_height * scale_factor * size_tuple[0], scrollbar_width=20)
+        # self.frame_create_s.grid(row=0, column=0, pady=4, padx=4, sticky='nesw')
         self.frame_inputs = CTkXYFrame(self.tab_inputs, width=window_width * scale_factor * size_tuple[1],
                                        height=window_height * scale_factor * size_tuple[0], scrollbar_width=20)
         self.frame_inputs.grid(row=0, column=0, pady=4, padx=4, sticky='nesw')
@@ -222,43 +226,41 @@ class MevegsGui:
 
         self.gui.protocol("WM_DELETE_WINDOW", self.btn_on_x_exit)
 
-        self.menu_source, menu_sources_path, menu_sources = self.source_list_populate()
-
         # TAB Create beam source
         # Column 0
-        self.lbl_header_input_source = ctk.CTkLabel(self.frame_create_s, text="CST Source",
-                                             font=('Helvetica', 16, 'bold'), fg_color=("grey90", "gray10"),
-                                             text_color=['black', 'white'], corner_radius=6)
-        self.lbl_header_input_source.grid(column=0, row=0, padx=5, pady=2, sticky='we')
-        self.lbl_project_source = ctk.CTkLabel(self.frame_create_s, text="CST file")
-        self.lbl_project_source.grid(column=0, row=1, padx=5, pady=2, sticky='e')
-
-            # Console Source
-        self.lbl_header_source = ctk.CTkLabel(self.frame_create_s, text="Console Log", font=('Helvetica', 16, 'bold'),
-                                             fg_color=("grey90", "gray10"), text_color=['black', 'white'],
-                                             corner_radius=6)
-        self.lbl_header_source.grid(column=0, row=19, padx=5, pady=1, sticky='we', columnspan=5)
-        self.console_text_box_source = ctk.CTkTextbox(master=self.frame_create_s, wrap='word', width=600, height=250,
-                                                     fg_color=['grey90',
-                                                               'grey10'])  # , text_color=['black', 'white'], state='disabled')
-        self.console_text_box_source.grid(column=0, row=20, padx=5, pady=2, sticky='nesw', columnspan=5, rowspan=18)
-
-        # Column 1
-        self.lbl_header_input_source1 = ctk.CTkLabel(self.frame_create_s, text="Title",
-                                              font=('Helvetica', 16, 'bold'), fg_color=("grey90", "gray10"),
-                                              text_color=['black', 'white'], corner_radius=6)
-        self.lbl_header_input_source1.grid(column=1, row=0, padx=5, pady=2, sticky='we', columnspan=2)
-        self.btn_cst_file_explore = ctk.CTkButton(self.frame_create_s, text=self.directory_file_cst_source,
-                                                command=lambda: sbsc.btn_cst_file_explore_clicked(self))
-        self.btn_cst_file_explore.grid(column=1, row=1, padx=(5, 0), pady=2, sticky='we')
-        self.btn_cst_data_preview = ctk.CTkButton(self.frame_create_s, text='Preview Source Spot',
-                                                  command=lambda: sbsc.btn_cst_data_preview_clicked(self))
-        self.btn_cst_data_preview.grid(column=1, row=9, padx=(5, 0), pady=2, sticky='we')
-
-        # Table below
-
-        self.table_cst_source = CTkTable(master=self.frame_create_s, row=9, column=3, values=self.dataframe_cst_file)
-        self.table_cst_source.grid(column=0, row=8, padx=(5,5), pady=2, sticky='we')
+        # self.lbl_header_input_source = ctk.CTkLabel(self.frame_create_s, text="CST Source",
+        #                                      font=('Helvetica', 16, 'bold'), fg_color=("grey90", "gray10"),
+        #                                      text_color=['black', 'white'], corner_radius=6)
+        # self.lbl_header_input_source.grid(column=0, row=0, padx=5, pady=2, sticky='we')
+        # self.lbl_project_source = ctk.CTkLabel(self.frame_create_s, text="CST file")
+        # self.lbl_project_source.grid(column=0, row=1, padx=5, pady=2, sticky='e')
+        #
+        #     # Console Source
+        # self.lbl_header_source = ctk.CTkLabel(self.frame_create_s, text="Console Log", font=('Helvetica', 16, 'bold'),
+        #                                      fg_color=("grey90", "gray10"), text_color=['black', 'white'],
+        #                                      corner_radius=6)
+        # self.lbl_header_source.grid(column=0, row=19, padx=5, pady=1, sticky='we', columnspan=5)
+        # self.console_text_box_source = ctk.CTkTextbox(master=self.frame_create_s, wrap='word', width=600, height=250,
+        #                                              fg_color=['grey90',
+        #                                                        'grey10'])  # , text_color=['black', 'white'], state='disabled')
+        # self.console_text_box_source.grid(column=0, row=20, padx=5, pady=2, sticky='nesw', columnspan=5, rowspan=18)
+        #
+        # # Column 1
+        # self.lbl_header_input_source1 = ctk.CTkLabel(self.frame_create_s, text="Title",
+        #                                       font=('Helvetica', 16, 'bold'), fg_color=("grey90", "gray10"),
+        #                                       text_color=['black', 'white'], corner_radius=6)
+        # self.lbl_header_input_source1.grid(column=1, row=0, padx=5, pady=2, sticky='we', columnspan=2)
+        # self.btn_cst_file_explore = ctk.CTkButton(self.frame_create_s, text=self.directory_file_cst_source,
+        #                                         command=lambda: sbsc.btn_cst_file_explore_clicked(self))
+        # self.btn_cst_file_explore.grid(column=1, row=1, padx=(5, 0), pady=2, sticky='we')
+        # self.btn_cst_data_preview = ctk.CTkButton(self.frame_create_s, text='Preview Source Spot',
+        #                                           command=lambda: sbsc.btn_cst_data_preview_clicked(self))
+        # self.btn_cst_data_preview.grid(column=1, row=9, padx=(5, 0), pady=2, sticky='we')
+        #
+        # # Table below
+        #
+        # self.table_cst_source = CTkTable(master=self.frame_create_s, row=9, column=3, values=self.dataframe_cst_file)
+        # self.table_cst_source.grid(column=0, row=8, padx=(5,5), pady=2, sticky='we')
 
         # Choose project directory
         self.lbl_header_input = ctk.CTkLabel(self.frame_inputs, text="Source Item",
@@ -307,14 +309,6 @@ class MevegsGui:
         self.btn_mesh_explore.grid(column=1, row=3, padx=5, pady=2, sticky='we', columnspan=2)
         self.lbl_mesh_1 = ctk.CTkLabel(self.frame_inputs, text='File path (filenames must not have spaces)')
         self.lbl_mesh_1.grid(column=4, row=3, padx=5, pady=2, sticky='w')
-        # Source - radiation
-        self.lbl_sources_1 = ctk.CTkLabel(self.frame_inputs, text="Phase-space sources")
-        self.lbl_sources_1.grid(column=0, row=4, padx=5, pady=2, sticky='e')
-        self.menu_source_1 = ctk.CTkOptionMenu(self.frame_inputs, variable=self.menu_source, values=menu_sources,
-                                               anchor='center')
-        self.menu_source_1.grid(column=1, row=4, padx=5, pady=2, sticky='ew', columnspan=2)
-        self.lbl_sources_11 = ctk.CTkLabel(self.frame_inputs, text="Optional")
-        self.lbl_sources_11.grid(column=4, row=4, padx=5, pady=2, sticky='w')
         # Choose results.msh file
         self.lbl_results_mesh_1 = ctk.CTkLabel(self.frame_inputs, text='.results.msh file')
         self.lbl_results_mesh_1.grid(column=0, row=5, padx=5, pady=2, sticky='e')
@@ -324,38 +318,30 @@ class MevegsGui:
         self.btn_results_mesh_explore.grid(column=1, row=5, padx=5, pady=2, sticky='we', columnspan=2)
         self.lbl_results_mesh_11 = ctk.CTkLabel(self.frame_inputs, text='File path')
         self.lbl_results_mesh_11.grid(column=4, row=5, padx=5, pady=2, sticky='w')
-        # Choose MevEGS.cpp directory
-        self.lbl_mevegs = ctk.CTkLabel(self.frame_inputs, text="Mevegs.cpp folder")
-        self.lbl_mevegs.grid(column=0, row=6, padx=5, pady=2, sticky='e')
-        self.btn_mevegs_explore = ctk.CTkButton(self.frame_inputs, text=self.directory_mevegs,
-                                                command=self.btn_mevegs_explore_clicked)
-        self.btn_mevegs_explore.grid(column=1, row=6, padx=5, pady=2, sticky='we', columnspan=2)
-        self.lbl_mevegs_1 = ctk.CTkLabel(self.frame_inputs, text="Directory path")
-        self.lbl_mevegs_1.grid(column=4, row=6, padx=5, pady=2, sticky='w')
+        # Choose MEVEGS.cpp directory
+        # self.lbl_mevegs = ctk.CTkLabel(self.frame_inputs, text="Mevegs.cpp folder")
+        # self.lbl_mevegs.grid(column=0, row=6, padx=5, pady=2, sticky='e')
+        # self.btn_mevegs_explore = ctk.CTkButton(self.frame_inputs, text=self.directory_mevegs,
+        #                                         command=self.btn_mevegs_explore_clicked)
+        # self.btn_mevegs_explore.grid(column=1, row=6, padx=5, pady=2, sticky='we', columnspan=2)
+        # self.lbl_mevegs_1 = ctk.CTkLabel(self.frame_inputs, text="Directory path")
+        # self.lbl_mevegs_1.grid(column=4, row=6, padx=5, pady=2, sticky='w')
         # Choose PEGS file
-        self.lbl_pegs = ctk.CTkLabel(self.frame_inputs, text='.pegs4dat file')
-        self.lbl_pegs.grid(column=0, row=7, padx=5, pady=2, sticky='e')
-        self.btn_pegs_explore = ctk.CTkButton(self.frame_inputs, text=self.directory_file_pegs,
-                                              command=self.btn_pegs_explore_clicked)
-        self.btn_pegs_explore.grid(column=1, row=7, padx=5, pady=2, sticky='we', columnspan=2)
-        self.lbl_pegs_1 = ctk.CTkLabel(self.frame_inputs, text='File path')
-        self.lbl_pegs_1.grid(column=4, row=7, padx=5, pady=2, sticky='w')
-        # Choose Post-pro scripts
-        self.lbl_postpro = ctk.CTkLabel(self.frame_inputs, text="Post-processing folder")
-        self.lbl_postpro.grid(column=0, row=8, padx=5, pady=2, sticky='e')
-        self.btn_postpro_explore = ctk.CTkButton(self.frame_inputs, text=self.directory_post_pro,
-                                                 command=self.btn_postpro_explore_clicked)
-        self.btn_postpro_explore.grid(column=1, row=8, padx=5, pady=2, sticky='we', columnspan=2)
-        self.lbl_postpro_1 = ctk.CTkLabel(self.frame_inputs, text="Directory path")
-        self.lbl_postpro_1.grid(column=4, row=8, padx=5, pady=2, sticky='w')
-        # MevEGS app HOME
-        self.lbl_ini = ctk.CTkLabel(self.frame_inputs, text="MevEGS*.py folder")
-        self.lbl_ini.grid(column=0, row=9, padx=5, pady=2, sticky='e')
-        self.btn_cluster_explore = ctk.CTkButton(self.frame_inputs, text=self.directory_ini,
-                                                 command=self.btn_cluster_explore_clicked)
-        self.btn_cluster_explore.grid(column=1, row=9, padx=5, pady=2, sticky='we', columnspan=2)
-        self.lbl_ini_1 = ctk.CTkLabel(self.frame_inputs, text="Directory path")
-        self.lbl_ini_1.grid(column=4, row=9, padx=5, pady=2, sticky='w')
+        # self.lbl_pegs = ctk.CTkLabel(self.frame_inputs, text='.pegs4dat file')
+        # self.lbl_pegs.grid(column=0, row=7, padx=5, pady=2, sticky='e')
+        # self.btn_pegs_explore = ctk.CTkButton(self.frame_inputs, text=self.directory_file_pegs,
+        #                                       command=self.btn_pegs_explore_clicked)
+        # self.btn_pegs_explore.grid(column=1, row=7, padx=5, pady=2, sticky='we', columnspan=2)
+        # self.lbl_pegs_1 = ctk.CTkLabel(self.frame_inputs, text='File path')
+        # self.lbl_pegs_1.grid(column=4, row=7, padx=5, pady=2, sticky='w')
+        # MEVEGS app HOME
+        # self.lbl_ini = ctk.CTkLabel(self.frame_inputs, text="MEVEGS*.py folder")
+        # self.lbl_ini.grid(column=0, row=9, padx=5, pady=2, sticky='e')
+        # self.btn_cluster_explore = ctk.CTkButton(self.frame_inputs, text=self.directory_ini,
+        #                                          command=self.btn_cluster_explore_clicked)
+        # self.btn_cluster_explore.grid(column=1, row=9, padx=5, pady=2, sticky='we', columnspan=2)
+        # self.lbl_ini_1 = ctk.CTkLabel(self.frame_inputs, text="Directory path")
+        # self.lbl_ini_1.grid(column=4, row=9, padx=5, pady=2, sticky='w')
         # Open file column
         self.btn_egsinp_file_open = ctk.CTkButton(self.frame_inputs, text='.egsinp', width=50,
                                                 command=self.btn_egsinp_file_open_clicked)
@@ -394,51 +380,58 @@ class MevegsGui:
         self.ptrack_number.set(10000)
         self.entry_nptracks.configure("center", justify='center')
         self.entry_nptracks.grid(column=0, row=2, padx=5, pady=2)
-        self.btn_ptracks = ctk.CTkButton(self.frame_1, text="Visualize simulation geometry (ptracks)",
+        self.btn_ptracks = ctk.CTkButton(self.frame_1, text="Run short simulation to show\n geometry and source",
                                          command=self.btn_ptracks_clicked)
         self.btn_ptracks.grid(column=0, row=3, padx=5, pady=2, sticky='we')
+        self.btn_show_ptracks = ctk.CTkButton(self.frame_1, text="Show simulation geometry\n and source",
+                                         command=self.show_ptracks_in_gmsh)
+        self.btn_show_ptracks.grid(column=0, row=4, padx=5, pady=2, sticky='we')
 
         # Run local mevegs with nJobs
 
         self.lbl_njobs = ctk.CTkLabel(self.frame_1,
                                       text='Number of Jobs: Max = number of CPUs\nMin = 1')
-        self.lbl_njobs.grid(column=0, row=4, padx=5, pady=2)
+        self.lbl_njobs.grid(column=0, row=7, padx=5, pady=2)
         self.job_number = ctk.StringVar()
         self.entry_njobs = ctk.CTkEntry(self.frame_1, textvariable=self.job_number, width=60)
         self.job_number.set(self.njobs)
         self.entry_njobs.configure("center", justify='center')
-        self.entry_njobs.grid(column=0, row=5, padx=5, pady=2)
+        self.entry_njobs.grid(column=0, row=8, padx=5, pady=2)
         self.entry_njobs.bind("<Return>", command=lambda event: self.btn_run_mevegs_clicked(event))  # This not working
-        self.btn_run_mevegs = ctk.CTkButton(self.frame_1, text="Run local MevEGS", height=75,
+        self.btn_run_mevegs = ctk.CTkButton(self.frame_1, text="Run local MEVEGS",  # height=75,
                                             command=lambda: self.btn_run_mevegs_clicked(self.entry_njobs.get()))
-        self.btn_run_mevegs.grid(column=0, row=6, padx=5, pady=2, rowspan=2, sticky='n')
-        self.btn_show_mevegs_progressbar = ctk.CTkButton(self.frame_1, text="Track local progress",
-                                                         command=lambda: self.btn_check_local_progress_clicked())
-        self.btn_show_mevegs_progressbar.grid(column=0, row=8, padx=5, pady=2, sticky='we')
+        self.btn_run_mevegs.grid(column=0, row=9, padx=5, pady=2, sticky='we')
+        # self.btn_show_mevegs_progressbar = ctk.CTkButton(self.frame_1, text="Track local progress",
+        #                                                  command=lambda: self.btn_check_local_progress_clicked('simulation'))
+        # self.btn_show_mevegs_progressbar.grid(column=0, row=11, padx=5, pady=2, sticky='we')
         self.mevegs_progress_bar = ctk.CTkProgressBar(self.frame_1)
-        self.mevegs_progress_bar.grid(column=0, row=9, padx=5, pady=2, sticky='we')
+        self.mevegs_progress_bar.grid(column=0, row=11, padx=5, pady=2, sticky='we')
         self.mevegs_progress_bar.set(self.bar_progress)
-        self.percent_label = ctk.CTkLabel(self.frame_1, text='0%')
-        self.percent_label.grid(column=0, row=10, padx=5, pady=2)
-        self.btn_show_mevegs_jobs = ctk.CTkButton(self.frame_1, text="Show number of jobs running",
+        self.percent_label = ctk.CTkLabel(self.frame_1, text='No sim running')
+        self.percent_label.grid(column=0, row=13, padx=5, pady=2)
+        self.btn_show_mevegs_jobs = ctk.CTkButton(self.frame_1, text="Show number of mevegs jobs running",
                                                   command=lambda: utils.btn_show_mevegs_jobs_clicked(self))
-        self.btn_show_mevegs_jobs.grid(column=0, row=11, padx=5, pady=2, sticky='we')
+        self.btn_show_mevegs_jobs.grid(column=0, row=14, padx=5, pady=2, sticky='we')
 
-        # Clean up files from MevEGS.cpp folder
+        # Clean up files from MEVEGS.cpp folder
         self.lbl_header_11 = ctk.CTkLabel(self.frame_1, text="Simulation Cleanup", font=('Helvetica', 16, 'bold'),
                                           fg_color=("grey90", "gray10"), text_color=['black', 'white'], corner_radius=6)
         self.lbl_header_11.grid(column=1, row=0, padx=5, pady=2, sticky='we')
-        self.btn_clean_up = ctk.CTkButton(self.frame_1, text='Move results files in\nMevEGS Home to\nProject directory',
+        self.btn_clean_up = ctk.CTkButton(self.frame_1, text='Move results files in\nMEVEGS Home to\nProject directory',
                                           command=lambda: [self.btn_clean_up_clicked(),
                                                            utils.return_running_jobs_to_null(self)])
         self.btn_clean_up.grid(column=1, row=1, padx=5, pady=2, rowspan=2, sticky='n')
-        self.btn_kill_mevegs = ctk.CTkButton(self.frame_1, text="Kill all MevEGS processes",
+
+        self.btn_load_project = ctk.CTkButton(self.frame_1, text='Load recently\ncompleted project', command=self.btn_project_explore_clicked)
+        self.btn_load_project.grid(column=1, row=3, padx=5, pady=2, sticky='n')
+
+        self.btn_kill_mevegs = ctk.CTkButton(self.frame_1, text="Kill all MEVEGS processes",
                                              command=lambda: utils.are_you_sure_kill(self))
-        self.btn_kill_mevegs.grid(column=1, row=4, padx=5, pady=2, sticky='n')
-        self.btn_restore_mevegs = ctk.CTkButton(self.frame_1, text='Restore MevEGS Home to default',
+        self.btn_kill_mevegs.grid(column=1, row=5, padx=5, pady=2, sticky='n')
+        self.btn_restore_mevegs = ctk.CTkButton(self.frame_1, text='Restore MEVEGS Home to default',
                                                 command=lambda: [utils.are_you_sure_cleanup(self),
                                                                  utils.return_running_jobs_to_null(self)])
-        self.btn_restore_mevegs.grid(column=1, row=7, padx=5, pady=2, sticky='n')
+        self.btn_restore_mevegs.grid(column=1, row=8, padx=5, pady=2, sticky='n')
         # Console Frame_1
         self.lbl_header_111 = ctk.CTkLabel(self.frame_1, text="Console Log", font=('Helvetica', 16, 'bold'),
                                            fg_color=("grey90", "gray10"), text_color=['black', 'white'],
@@ -465,23 +458,23 @@ class MevegsGui:
         self.btn_check_cluster_2 = ctk.CTkButton(self.frame_2, text='Cluster Status',
                                                  command=lambda: cluster.btn_check_cluster_status_clicked(self))
         self.btn_check_cluster_2.grid(column=0, row=4, padx=5, pady=5, sticky='we')
-        self.lbl_username_2 = ctk.CTkLabel(self.frame_2,
-                                                     text="Cluster Username")
-        self.lbl_username_2.grid(column=0, row=5, padx=5, pady=2, sticky='we')
-        self.username, usernames = self.username_list_choice()
-        self.optionmenu_user_2 = ctk.CTkOptionMenu(self.frame_2, variable=self.username,
-                                                   values=usernames,
-                                                   anchor='center')
-        self.optionmenu_user_2.grid(column=0, row=6, padx=5, pady=2, sticky='we')
+        # self.lbl_username_2 = ctk.CTkLabel(self.frame_2,
+        #                                              text="Cluster Username")
+        # self.lbl_username_2.grid(column=0, row=5, padx=5, pady=2, sticky='we')
+        # self.username, usernames = self.username_list_choice()
+        # self.optionmenu_user_2 = ctk.CTkOptionMenu(self.frame_2, variable=self.username,
+        #                                            values=usernames,
+        #                                            anchor='center')
+        # self.optionmenu_user_2.grid(column=0, row=6, padx=5, pady=2, sticky='we')
         self.btn_display_job_progress_2 = ctk.CTkButton(self.frame_2, text='Display job log', anchor='center',
                                                         command=lambda: [
                                                             cluster.btn_display_cluster_log_file_clicked_2(self,
-                                                                                                           self.optionmenu_user_2.get())])
+                                                                                                           self.username)])
         self.btn_display_job_progress_2.grid(column=0, row=7, padx=5, pady=2, sticky='we')
         self.btn_display_cluster_status_2 = ctk.CTkButton(self.frame_2, text='Display cluster queue', anchor='center',
                                                           command=lambda: [
                                                               cluster.btn_display_cluster_status_clicked_2(self,
-                                                                                                           self.optionmenu_user_2.get())])
+                                                                                                           self.username)])
         self.btn_display_cluster_status_2.grid(column=0, row=8, padx=5, pady=2, sticky='we')
 
         # COLUMN 1
@@ -498,7 +491,7 @@ class MevegsGui:
         self.optionmenu_job_2['state'] = 'normal'
         self.btn_kill_2 = ctk.CTkButton(self.frame_2, text='Kill current job and cleanup',
                                         command=lambda: [
-                                            cluster.btn_kill_cluster_jobs_clicked(self, self.optionmenu_user_2.get(),
+                                            cluster.btn_kill_cluster_jobs_clicked(self, self.username,
                                                                                   self.optionmenu_job_2.get())])  # , fg_color="OrangeRed4", hover_color="OrangeRed2"
         self.btn_kill_2.grid(column=1, row=3, padx=5, pady=2)
         self.btn_retrieve_2 = ctk.CTkButton(self.frame_2, text='Retrieve all submissions', width=150, height=75,
@@ -612,23 +605,16 @@ class MevegsGui:
             int(scale_factor * screen_height))
         utils.write_to_console_log(self, screen_res)
         utils.write_to_console_log(self,
-                                   "MevEGS:\n\tAppearance mode:\t\t" + self.appearance + '\n' + "\n\tColor-theme:\t\t" + self.color_theme)
+                                   "MEVEGS:\n\tAppearance mode:\t\t" + self.appearance + '\n' + "\n\tColor-theme:\t\t" + self.color_theme)
         utils.create_hover_tooltips(self)
         if os.path.isfile(self.directory_ini + '/mevegs_app.ini'):
             self.check_config_file()
-            # try:
-            #     utils.load_gmsh_data_for_figures(self, self.directory_file_project_msh,
-            #                                  self.directory_project, self.directory_file_egsinp)
-            # except:
-            #     pass
             
         # Initialization messages to Mevegs console and ToolTips
         self.menu_data, menu_data_path, menu_datas = self.data_list_populate()  # has to be initialized after check_config (for now)
-        username = ctk.StringVar()
-        username.set("Choose source")
         if self.directory_project != 'Choose Project Directory':
-            utils.write_to_console_log(self, "MevEGS:\t\tAuto loaded last workspace - " + self.directory_project)
-        
+            utils.write_to_console_log(self, "MEVEGS:\t\tAuto loaded last workspace - " + self.directory_project)
+        utils.write_to_console_log(self, "MeVEGS:\t\tUI " + self.version)
     # Button/Event control
 
     def scale_window(self,
@@ -652,77 +638,86 @@ class MevegsGui:
         initial_dir = self.directory_mevegs
         directory_mevegs = filedialog.askdirectory(initialdir=initial_dir)
         self.directory_mevegs = directory_mevegs + '/'
-        self.btn_mevegs_explore.configure(text=os.path.basename(os.path.dirname(self.directory_mevegs)))
-        utils.write_to_console_log(self, 'MevEGS:\t\tDirectory set - ' + self.directory_mevegs)
-        self.btn_mevegs_explore_tip.configure(message=self.directory_mevegs)
-        self.frame_1.update_idletasks()
+        self.btn_mevegs_explore.configure(text=self.directory_mevegs)
+        utils.write_to_console_log(self, 'MEVEGS:\t\tMEVEGS \'HOME\' Directory set - ' + self.directory_mevegs)
+        # self.btn_mevegs_explore_tip.configure(message=self.directory_mevegs)
+        # self.frame_1.update_idletasks()
         return self.directory_mevegs
-
-    def btn_postpro_explore_clicked(self):
-        initial_dir = self.directory_post_pro
-        directory_post_pro = filedialog.askdirectory(initialdir=initial_dir)
-        self.directory_post_pro = directory_post_pro + '/'
-        self.btn_postpro_explore.configure(text=os.path.basename(os.path.dirname(self.directory_post_pro)))
-        utils.write_to_console_log(self, 'MevEGS:\t\tDirectory set - ' + self.directory_post_pro)
-        self.btn_postpro_explore_tip.configure(message=self.directory_post_pro)
-        self.frame_1.update_idletasks()
-        return self.directory_post_pro
 
     def btn_project_explore_clicked(self):
         initial_dir = self.directory_project
         directory_project = filedialog.askdirectory(initialdir=initial_dir)
-        self.directory_project = directory_project + '/'
-        self.btn_project_explore.configure(text=os.path.basename(os.path.dirname(self.directory_project)))
-        utils.update_phasespace_warning_label(self)
-        utils.write_to_console_log(self, 'MevEGS:\t\tProject loaded - ' + self.directory_project)
-        # project_save_files = glob.glob(self.directory_project + '*.save', recursive=False)
-        # if len(project_save_files) == 1:
-        #     self.load_dict_from_file(project_save_files[0])
-        # elif not project_save_files:
-        project_egsinp_files = glob.glob(self.directory_project + '*.egsinp', recursive=False)
-        if len(project_egsinp_files) == 1:
-            self.directory_file_egsinp = project_egsinp_files[0]
-            self.load_proper_filenames_from_dict(self.btn_egsinp_explore, self.directory_file_egsinp)
-        project_msh_files = glob.glob(self.directory_project + '*.msh', recursive=False)
-        for item in project_msh_files:
-            if item.endswith('.results.msh'.lower()):
-                project_msh_files.remove(item)
-        for item in project_msh_files:
-            if item.endswith('.ptracks.msh'.lower()):
-                project_msh_files.remove(item)
-        if len(project_msh_files) == 1:
-            self.directory_file_msh = project_msh_files[0]
-            self.load_proper_filenames_from_dict(self.btn_mesh_explore, self.directory_file_msh)
-        project_results_msh_files = glob.glob(self.directory_project + '*results.msh'.lower(), recursive=False)
-        if len(project_results_msh_files) == 1:
-            self.directory_file_project_msh = project_results_msh_files[0]
-            self.btn_results_mesh_explore.configure(
-                text='.'.join(os.path.basename(self.directory_file_project_msh).split('.')[:-2]))
-            path_res_mesh = '  /  '.join(os.path.dirname(self.directory_file_project_msh).split('/')[-2:])
-            name_res_mesh = os.path.basename('.'.join(os.path.basename(self.directory_file_project_msh).split('.')[:-2]))
-            self.lbl_results_header_3.configure(text=path_res_mesh + '  /  ' + name_res_mesh)
-        utils.update_hover_tooltips(self)
-        if self.directory_file_project_msh.startswith("Choose"):
-            pass
+        if not directory_project:
+            return
         else:
-            utils.load_gmsh_data_for_figures(self, self.directory_file_project_msh,
-                                             self.directory_project, self.directory_file_egsinp)
-        # try:
-        #     utils.load_gmsh_data_for_figures(self, self.directory_file_project_msh,
-        #                                  self.directory_project, self.directory_file_egsinp)
-        # except:
-        #     pass
-        self.frame_inputs.update_idletasks()
-        self.gui.update_idletasks()
-        return self.directory_project
+            self.directory_project = directory_project + '/'
+            if self.directory_project.startswith("Choose"):
+                self.btn_project_explore.configure(text=self.directory_project)
+                utils.write_to_console_log(self, 'MEVEGS:\t\tNo project directory chosen')
+            else:
+                self.btn_project_explore.configure(text=os.path.basename(os.path.dirname(self.directory_project)))
+                utils.write_to_console_log(self, 'MEVEGS:\t\tProject loaded - ' + self.directory_project)
+            self.btn_project_explore_tip.configure(message=self.directory_project + '\nOne simulation per project folder\n'
+                                                                                'A main project folder can have many subfolders')
+            utils.update_phasespace_warning_label(self)
+            project_egsinp_files = glob.glob(self.directory_project + '*.egsinp', recursive=False)
+            if len(project_egsinp_files) == 1:
+                self.directory_file_egsinp = project_egsinp_files[0]
+                self.load_proper_filenames_from_dict(self.btn_egsinp_explore, self.directory_file_egsinp)
+            else:
+                utils.write_to_console_log(self, "There are multiple .egsinp files in this project directory")
+                self.directory_file_egsinp = "Choose .egsinp File"
+                self.btn_egsinp_explore.configure(text=self.directory_file_egsinp)
+            project_msh_files = glob.glob(self.directory_project + '*.msh', recursive=False)
+            for item in project_msh_files:
+                if item.endswith('.results.msh'.lower()):
+                    project_msh_files.remove(item)
+            for item in project_msh_files:
+                if item.endswith('.ptracks.msh'.lower()):
+                    project_msh_files.remove(item)
+            if len(project_msh_files) == 1:
+                self.directory_file_msh = project_msh_files[0]
+                self.load_proper_filenames_from_dict(self.btn_mesh_explore, self.directory_file_msh)
+            else:
+                utils.write_to_console_log(self, "There are multiple .msh files in this project directory")
+                self.directory_file_msh = "Choose .msh File"
+                self.btn_mesh_explore.configure(text=self.directory_file_msh)
+            project_results_msh_files = glob.glob(self.directory_project + '*results.msh'.lower(), recursive=False)
+            if len(project_results_msh_files) == 1:
+                self.directory_file_project_msh = project_results_msh_files[0]
+                self.btn_results_mesh_explore.configure(
+                    text='.'.join(os.path.basename(self.directory_file_project_msh).split('.')[:-2]))
+                path_res_mesh = '  /  '.join(os.path.dirname(self.directory_file_project_msh).split('/')[-2:])
+                name_res_mesh = os.path.basename('.'.join(os.path.basename(self.directory_file_project_msh).split('.')[:-2]))
+                self.lbl_results_header_3.configure(text=path_res_mesh + '  /  ' + name_res_mesh)
+            else:
+                utils.write_to_console_log(self, "There are multiple .results.msh files in this project directory")
+                self.directory_file_project_msh = "Choose .results.msh File"
+                self.btn_results_mesh_explore.configure(text=self.directory_file_project_msh)
+            utils.update_hover_tooltips(self)
+            if self.directory_file_project_msh.startswith("Choose"):
+                pass
+            else:
+                utils.load_gmsh_data_for_figures(self, self.directory_file_project_msh,
+                                                 self.directory_project, self.directory_file_egsinp)
+            self.frame_inputs.update_idletasks()
+            self.tab_2.update_idletasks()
+            self.gui.update_idletasks()
+            return self.directory_project
 
     def btn_egsinp_explore_clicked(self):
         initial_file = self.directory_file_egsinp
         directory_file_egsinp = filedialog.askopenfilename(initialfile=initial_file,
                                                            filetypes=[('egsinp files', '*.egsinp')])
+        if not directory_file_egsinp:
+            return
         self.directory_file_egsinp = directory_file_egsinp
-        self.btn_egsinp_explore.configure(text='.'.join(os.path.basename(self.directory_file_egsinp).split('.')[:-1]))
-        utils.write_to_console_log(self, 'MevEGS:\t\tFile loaded - ' + self.directory_file_egsinp)
+        if self.directory_file_egsinp.startswith("Choose"):
+            self.btn_egsinp_explore.configure(text=self.directory_file_egsinp)
+            utils.write_to_console_log(self, 'MEVEGS:\t\tNo .egsinp file chosen')
+        else:
+            self.btn_egsinp_explore.configure(text='.'.join(os.path.basename(self.directory_file_egsinp).split('.')[:-1]))
+            utils.write_to_console_log(self, 'MEVEGS:\t\tInput file loaded - ' + self.directory_file_egsinp)
         self.btn_egsinp_explore_tip.configure(message=self.directory_file_egsinp)
         self.frame_inputs.update_idletasks()
         return self.directory_file_egsinp
@@ -730,9 +725,16 @@ class MevegsGui:
     def btn_mesh_explore_clicked(self):
         initial_file = self.directory_file_msh
         directory_file_msh = filedialog.askopenfilename(initialfile=initial_file, filetypes=[('mesh files', '*.msh')])
+        if not directory_file_msh:
+            return
         self.directory_file_msh = directory_file_msh
-        self.btn_mesh_explore.configure(text='.'.join(os.path.basename(self.directory_file_msh).split('.')[:-1]))
-        utils.write_to_console_log(self, 'MevEGS:\t\tFile loaded - ' + self.directory_file_msh)
+        if self.directory_file_msh.startswith("Choose"):
+            self.btn_mesh_explore.configure(text=self.directory_file_msh)
+            utils.write_to_console_log(self, 'MEVEGS:\t\tNo .msh file chosen')
+        else:
+            self.btn_mesh_explore.configure(
+                text='.'.join(os.path.basename(self.directory_file_msh).split('.')[:-1]))
+            utils.write_to_console_log(self, 'MEVEGS:\t\tMesh file loaded - ' + self.directory_file_msh)
         self.btn_mesh_explore_tip.configure(message=self.directory_file_msh)
         self.frame_1.update_idletasks()
         return self.directory_file_msh
@@ -740,21 +742,23 @@ class MevegsGui:
     def btn_pegs_explore_clicked(self):
         directory_file_pegs = filedialog.askopenfilename(initialfile=os.path.basename(self.directory_file_pegs),
                                                          filetypes=[('pegs files', '*.pegs4dat')])
+        if not directory_file_pegs:
+            return
         self.directory_file_pegs = directory_file_pegs
-        self.btn_pegs_explore.configure(text='.'.join(os.path.basename(self.directory_file_pegs).split('.')[:-1]))
-        utils.write_to_console_log(self, 'MevEGS:\t\tFile loaded - ' + self.directory_file_pegs)
-        self.btn_pegs_explore_tip.configure(message=self.directory_file_pegs)
-        self.frame_1.update_idletasks()
-        return self.directory_file_pegs
+        self.btn_pegs_explore.configure(text=self.directory_file_pegs)
+        utils.write_to_console_log(self, 'MEVEGS:\t\tPEGS file loaded - ' + self.directory_file_pegs)
+        # self.btn_pegs_explore_tip.configure(message=self.directory_file_pegs)
+        # self.frame_1.update_idletasks()
+        # return self.directory_file_pegs
 
-    def btn_cluster_explore_clicked(self):
-        directory_ini = filedialog.askdirectory(initialdir=self.directory_ini)
-        self.directory_ini = directory_ini + '/'
-        self.btn_cluster_explore.configure(text=os.path.basename(os.path.dirname(self.directory_ini)))
-        utils.write_to_console_log(self, 'MevEGS:\t\tDirectory set - ' + self.directory_ini)
-        self.btn_cluster_explore_tip.configure(message=self.directory_ini)
-        self.frame_inputs.update_idletasks()
-        return self.directory_ini
+    # def btn_cluster_explore_clicked(self):
+    #     directory_ini = filedialog.askdirectory(initialdir=self.directory_ini)
+    #     self.directory_ini = directory_ini + '/'
+    #     self.btn_cluster_explore.configure(text=os.path.basename(os.path.dirname(self.directory_ini)))
+    #     utils.write_to_console_log(self, 'MEVEGS:\t\tDirectory set - ' + self.directory_ini)
+    #     self.btn_cluster_explore_tip.configure(message=self.directory_ini)
+    #     self.frame_inputs.update_idletasks()
+    #     return self.directory_ini
 
     def btn_egsinp_file_open_clicked(self):  # for a non-Windows solution, try webbrowser.open()
         path = os.path.dirname(self.directory_file_egsinp)
@@ -772,29 +776,19 @@ class MevegsGui:
         path = self.directory_project
         os.startfile(path)
 
-    def source_list_populate(self):
-        menu_sources = ['None']
-        menu_sources_path = glob.glob(self.directory_ini + 'Source_Phasespace_Files/*', recursive=False)
-        for item_ in menu_sources_path:
-            menu_sources.append(os.path.basename(item_))
-        menu_source = ctk.StringVar()
-        menu_source.set("Choose source")
-        self.frame_1.update_idletasks()
-        return menu_source, menu_sources_path, menu_sources
-
-    def username_list_choice(self):
-        usernames = ['Choose cluster username', 'bwz', 'dmm', 'las', 'MDE', 'mjr', 'wjl']
-        if os.path.isfile(self.directory_ini + 'mevegs_app.ini'):
-            with open(self.directory_ini + 'mevegs_app.ini', "r") as _file:
-                pd_dataframe = pd.read_csv(_file, header=None)
-                saved_info_dict = dict(zip(pd_dataframe[0], pd_dataframe[1]))
-                username = ctk.StringVar()
-                username.set(saved_info_dict['username'])
-        else:
-            username = ctk.StringVar()
-            username.set("Choose cluster username")
-        self.frame_2.update_idletasks()
-        return username, usernames
+    # def username_list_choice(self):
+    #     usernames = ['Choose cluster username', 'bwz', 'dmm', 'las', 'MDE', 'mjr', 'wjl']
+    #     if os.path.isfile(self.directory_ini + 'mevegs_app.ini'):
+    #         with open(self.directory_ini + 'mevegs_app.ini', "r") as _file:
+    #             pd_dataframe = pd.read_csv(_file, header=None)
+    #             saved_info_dict = dict(zip(pd_dataframe[0], pd_dataframe[1]))
+    #             username = ctk.StringVar()
+    #             username.set(saved_info_dict['username'])
+    #     else:
+    #         username = ctk.StringVar()
+    #         username.set("Choose cluster username")
+    #     self.frame_2.update_idletasks()
+    #     return username, usernames
 
     def data_list_populate(self):
         menu_datas = ['None']
@@ -840,36 +834,7 @@ class MevegsGui:
                 os.replace(object_,
                            self.directory_mevegs + file_egsinp.split('.egsinp')[0] + '_' + file_msh.split('.msh')[
                                0] + '.results.msh.egsinfo')
-        if os.path.isfile(self.directory_mevegs + results_msh):
-            if os.path.isdir(self.directory_project) and os.path.isfile(self.directory_project + results_msh):
-                self.topframe = ctk.CTkToplevel(self.gui)  # , fg_color="steel blue"
-                self.topframe.grab_set()
-                self.topframe.geometry("700x300")
-                self.topframe.attributes('-topmost', True)
-                self.topframe.update()
-                self.topframe.focus()
-                self.topframe.title('File already exists')
-                self.topframe.grid_columnconfigure(0, weight=1)
-                self.topframe.grid_columnconfigure(1, weight=1)
-                self.topframe.grid_columnconfigure(2, weight=1)
-                self.topframe.grid_rowconfigure(0, weight=1)
-                self.topframe.grid_rowconfigure(1, weight=1)
-                self.warning = ctk.CTkLabel(self.topframe, font=("Arial", 20),
-                                            text='Do you want to overwrite:\n\n' + results_msh.split('.results.msh')[
-                                                0] + '\n\n and associated simulation files in\n\n' + self.directory_project + '?')
-                self.warning.grid(column=0, row=0, pady=10, padx=10, columnspan=3, sticky='nsew')
-                self.yes_button = ctk.CTkButton(self.topframe, text='Yes, proceed',
-                                                command=lambda: [self.btn_exit_popup(), self.copy_mevegs_sumulation()])
-                self.yes_button.grid(column=0, row=1, pady=10, padx=10, sticky='nesw')
-                self.exit_button = ctk.CTkButton(master=self.topframe, text='No, cancel', command=self.btn_exit_popup)
-                self.exit_button.grid(column=1, row=1, pady=10, padx=10, sticky='nesw')
-                self.rename_button = ctk.CTkButton(master=self.topframe,
-                                                   text='No, make or choose\nnew project directory',
-                                                   command=lambda: [self.btn_exit_popup(),
-                                                                    self.set_project_directory_mevegs()])
-                self.rename_button.grid(column=2, row=1, pady=10, padx=10, sticky='nesw')
-            else:
-                self.copy_mevegs_sumulation()
+        self.copy_mevegs_simulation()
 
     def btn_restore_mevegs_clicked(self):
         os.chdir(self.directory_mevegs)
@@ -911,6 +876,10 @@ class MevegsGui:
         for object_ in items_egsphsp1:
             if os.path.isfile(object_):
                 os.remove(object_)
+        items_txt = glob.glob(self.directory_mevegs + '/*.txt', recursive=False)
+        for object_ in items_txt:
+            if os.path.isfile(object_):
+                os.remove(object_)
         if os.path.isfile(self.directory_mevegs + 'mevegs_visualize_console_output_1.mvgs'):
             os.remove(self.directory_mevegs + 'mevegs_visualize_console_output_1.mvgs')
         items_ptracks = glob.glob(self.directory_mevegs + '/*.ptracks', recursive=False)
@@ -921,11 +890,13 @@ class MevegsGui:
         for object_ in items_ptracks_opt:
             if os.path.isfile(object_):
                 os.remove(object_)
-        if os.path.isfile(self.directory_mevegs + str(self.menu_source_1.get())):
-            os.remove(self.directory_mevegs + str(self.menu_source_1.get()))
+        self.quit_progress_bar = False
+        self.mevegs_progress_bar.set(0)
+        self.percent_label.configure(text=str('No jobs running'))
+        self.bar_progress = 0
+        self.frame_1.update_idletasks()
+        self.gui.update_idletasks()
         os.chdir(self.directory_ini)
-        # if os.path.isfile('mevegs_cluster_console_output_1.mvgs'):
-        #     os.remove('mevegs_cluster_console_output_1.mvgs')
 
     def btn_save_state_clicked(self):
         save_dict = self.mevegs_save_dictionary()
@@ -936,22 +907,21 @@ class MevegsGui:
         if file_ is None:  # asksaveasfile return `None` if dialog closed with "cancel".
             return
         self.load_dict_from_file(file_)
-        utils.write_to_console_log(self, "MevEGS:\t\tLoaded project - " + self.directory_project)
-        self.gui.update_idletasks()
+        # utils.write_to_console_log(self, "MEVEGS:\t\tProject loaded - " + self.directory_project)
+        # self.gui.update_idletasks()
 
     def mevegs_save_dictionary(self):
         save_dict = {
             'mevegs': self.directory_mevegs,
             'pegs': self.directory_file_pegs,
-            'post_pro': self.directory_post_pro,
             'egsinp': self.directory_file_egsinp,
             'msh': self.directory_file_msh,
             'project': self.directory_project,
             'results': self.directory_file_project_msh,
-            'source': self.menu_source_1.get(),
             'data': self.menu_data_3.get(),
             'numjobs': self.entry_njobs.get(),
-            'username': self.optionmenu_user_2.get(),
+            # 'username': self.optionmenu_user_2.get(),
+            'username': self.username,
             'appearance': ctk.get_appearance_mode(),
             'color_theme': ctk.ThemeManager._currently_loaded_theme
         }
@@ -995,7 +965,6 @@ class MevegsGui:
         pd_dataframe = pd.read_csv(_file, header=None)
         saved_info_dict = dict(zip(pd_dataframe[0], pd_dataframe[1]))
         self.directory_mevegs = saved_info_dict['mevegs']
-        self.directory_post_pro = saved_info_dict['post_pro']
         self.directory_file_egsinp = saved_info_dict['egsinp']
         self.directory_file_msh = saved_info_dict['msh']
         self.directory_file_pegs = saved_info_dict['pegs']
@@ -1003,39 +972,47 @@ class MevegsGui:
         self.njobs = saved_info_dict['numjobs']
         self.directory_file_project_msh = saved_info_dict['results']
         self.username = saved_info_dict['username']
-        self.menu_source = str(saved_info_dict['source'])
         self.gmsh_views = ''
         self.gmsh_groups = ''
-        path_res_mesh = ' / '.join(os.path.dirname(self.directory_file_project_msh).split('/')[-2:])
-        name_res_mesh = os.path.basename('.'.join(os.path.basename(self.directory_file_project_msh).split('.')[:-2]))
-        self.lbl_results_header_3.configure(text=path_res_mesh + ' / ' + name_res_mesh)
-        self.load_proper_dirnames_from_dict(self.btn_mevegs_explore, self.directory_mevegs)
-        self.load_proper_dirnames_from_dict(self.btn_postpro_explore, self.directory_post_pro)
-        self.load_proper_dirnames_from_dict(self.btn_project_explore, self.directory_project)
-        self.load_proper_dirnames_from_dict(self.btn_cluster_explore, self.directory_ini)
-        self.load_proper_filenames_from_dict(self.btn_egsinp_explore, self.directory_file_egsinp)
-        self.load_proper_filenames_from_dict(self.btn_mesh_explore, self.directory_file_msh)
-        self.load_proper_filenames_from_dict(self.btn_pegs_explore, self.directory_file_pegs)
-        if self.directory_file_project_msh.startswith("Choose"):
-            self.btn_results_mesh_explore.configure(text=self.directory_file_project_msh)
+        self.appearance = saved_info_dict['appearance']
+        self.color_theme = saved_info_dict['color_theme']
+        # Check color theme and appearance
+        if self.appearance == ctk.get_appearance_mode() and self.color_theme == ctk.ThemeManager._currently_loaded_theme:
+            path_res_mesh = ' / '.join(os.path.dirname(self.directory_file_project_msh).split('/')[-2:])
+            name_res_mesh = os.path.basename(
+                '.'.join(os.path.basename(self.directory_file_project_msh).split('.')[:-2]))
+            self.lbl_results_header_3.configure(text=path_res_mesh + ' / ' + name_res_mesh)
+            # self.load_proper_dirnames_from_dict(self.btn_mevegs_explore, self.directory_mevegs)
+            self.load_proper_dirnames_from_dict(self.btn_project_explore, self.directory_project)
+            # self.load_proper_dirnames_from_dict(self.btn_cluster_explore, self.directory_ini)
+            self.load_proper_filenames_from_dict(self.btn_egsinp_explore, self.directory_file_egsinp)
+            self.load_proper_filenames_from_dict(self.btn_mesh_explore, self.directory_file_msh)
+            # self.load_proper_filenames_from_dict(self.btn_pegs_explore, self.directory_file_pegs)
+            if self.directory_file_project_msh.startswith("Choose"):
+                self.btn_results_mesh_explore.configure(text=self.directory_file_project_msh)
+            else:
+                self.btn_results_mesh_explore.configure(
+                    text='.'.join(os.path.basename(self.directory_file_project_msh).split('.')[:-2]))
+            self.job_number.set(self.njobs)
+            if self.directory_file_egsinp.startswith("Choose") or self.directory_file_msh.startswith("Choose"):
+                self.gui.title('MEVEGS')
+            else:
+                self.gui.title('MEVEGS - ' + (self.directory_file_egsinp.split('/')[-1]).split('.egsinp')[0] + '_' +
+                               (self.directory_file_msh.split('/')[-1]).split('.msh')[0])
+            # self.optionmenu_user_2.set(self.username)
+            if os.path.isfile(self.directory_file_project_msh):
+                utils.load_gmsh_data_for_figures(self, self.directory_file_project_msh,
+                                                 self.directory_project, self.directory_file_egsinp)
+            utils.update_hover_tooltips(self)
+            utils.update_phasespace_warning_label(self)
+            utils.write_to_console_log(self, "MEVEGS:\t\tProject loaded - " + self.directory_project)
+            self.gui.update_idletasks()
+        #restart UI to initialize themes
         else:
-            self.btn_results_mesh_explore.configure(text='.'.join(os.path.basename(self.directory_file_project_msh).split('.')[:-2]))
-        self.job_number.set(self.njobs)
-        if self.directory_file_egsinp.startswith("Choose") or self.directory_file_msh.startswith("Choose"):
-            self.gui.title('MevEGS')
-        else:
-            self.gui.title('MevEGS - ' + (self.directory_file_egsinp.split('/')[-1]).split('.egsinp')[0] + '_' +
-                       (self.directory_file_msh.split('/')[-1]).split('.msh')[0])
-        self.optionmenu_user_2.set(self.username)
-        if os.path.isfile(self.directory_file_project_msh):
-            utils.load_gmsh_data_for_figures(self, self.directory_file_project_msh,
-                                             self.directory_project, self.directory_file_egsinp)
-        self.btn_results_retrieve_2.configure(text='Open directory\n' +
-                                                         os.path.basename(os.path.dirname(self.directory_project)))
-        self.menu_source_1.set(self.menu_source)
-        utils.update_hover_tooltips(self)
-        utils.update_phasespace_warning_label(self)
-        self.gui.update_idletasks()
+            ctk.set_default_color_theme(self.color_theme)
+            ctk.set_appearance_mode(self.appearance)
+            utils.color_theme_notice(self)
+
 
     def load_proper_filenames_from_dict(self, _object, name):
         if name.startswith("Choose"):
@@ -1091,15 +1068,16 @@ class MevegsGui:
         default_filename = file_egsinp.split('.egsinp')[0] + '_' + file_msh.split('.msh')[0]
         file_ = filedialog.asksaveasfile(title='Save current workspace fields', initialfile=default_filename,
                                          initialdir=self.directory_project, mode='w', defaultextension=".save",
-                                         filetypes=(('MevEGS Project Save File', '.save'),))
+                                         filetypes=(('MEVEGS Project Save File', '.save'),))
         if file_ is None:  # asksaveasfile return `None` if dialog closed with "cancel".
             return
         with open(file_.name, 'w', newline='') as myfile:
             w = csv.writer(myfile)
             w.writerows(workspace_dict.items())
-        self.gui.title('MevEGS - ' + (file_.name.split('/')[-1]).split('.save')[0])
-        utils.write_to_console_log(self, 'MevEGS:\t\tProject saved as: ' + file_.name + '\nin ' +
+        self.gui.title('MEVEGS - ' + (file_.name.split('/')[-1]).split('.save')[0])
+        utils.write_to_console_log(self, 'MEVEGS:\t\tProject saved as: ' + file_.name + '\nin ' +
                                    self.directory_project)
+        os.chdir(self.directory_ini)
         self.gui.update_idletasks()
 
     def quick_save(self):
@@ -1110,72 +1088,75 @@ class MevegsGui:
         with open(self.directory_project + file_ + '.save', 'w', newline='') as myfile:
             w = csv.writer(myfile)
             w.writerows(save_dict.items())
-        self.gui.title('MevEGS - ' + file_)
+        self.gui.title('MEVEGS - ' + file_)
         textbox_text = self.console_text_box_input.get('2.20', '2.33')  # grabs most recent quick_save output
         if textbox_text == 'Project saved':  # doesn't print save note every time a tab is changed unless work ...
             pass  # ...has happened in between
         else:
-            utils.write_to_console_log(self, 'MevEGS:\t\tProject saved as: ' + file_ + '.save\nin ' +
+            utils.write_to_console_log(self, 'MEVEGS:\t\tProject saved as: ' + file_ + '.save\nin ' +
                                    self.directory_project)
+        os.chdir(self.directory_ini)
         self.gui.update_idletasks()
 
     def visualize_geometry(self):
         shutil.copy2(self.directory_file_msh, self.directory_mevegs)
         shutil.copy2(self.directory_file_egsinp, self.directory_mevegs)
-        if os.path.isfile(self.directory_ini + 'Source_Phasespace_Files/' + str(self.menu_source_1.get())):
-            shutil.copy2(self.directory_ini + 'Source_Phasespace_Files/' + str(self.menu_source_1.get()),
-                         self.directory_mevegs)
-        time.sleep(2)
+        # Below code reads egsinp to find 'phase space file'. This file then must be in the project directory with the egsinp so that it can be copied to the mevegs 'home'/cluster for simulation
+        source_file = str()
+        phase_space_file_check = str()
+        with open(self.directory_file_egsinp, "r") as f:
+            for line in f:
+                if re.search('phase space file', line):
+                    phase_space_file_check = line
+                    source_file = line.split('=')[1]
+                    break
+        if phase_space_file_check and source_file == '':
+            utils.write_to_console_log(self,
+                                       'Either the phase space source file is not in the project directory,'
+                                       ' or the phase space file does not follow the convention: '
+                                       'phase space file = filename.egsphsp1.txt or filename.txt')
+        stripped_source_file = source_file.strip()
+        if stripped_source_file and phase_space_file_check:
+            if not os.path.isfile(self.directory_project + stripped_source_file):
+                utils.write_to_console_log(self,
+                                           'Phase space source requested in .egsinp file is not in project directory')
+        if os.path.isfile(self.directory_project + stripped_source_file):
+            shutil.copy2(self.directory_project + stripped_source_file, self.directory_mevegs)
+        elif not phase_space_file_check:
+            utils.write_to_console_log(self, 'No phase space source requested in .egsinp file')
+        time.sleep(3)  # to let things copy... big things
         _, file_egsinp = os.path.split(self.directory_file_egsinp)
-        os.chdir(self.directory_mevegs)
-        self.replace_ncase(file_egsinp)
+        self.replace_ncase(self.directory_mevegs + file_egsinp)
         _, file_msh = os.path.split(self.directory_file_msh)
         _, file_pegs = os.path.split(self.directory_file_pegs)
         numjobs = 1
-        # bar_progress = -1
+        os.chdir(self.directory_mevegs)
         total_progress = [0] * int(numjobs)
         command = 'mevegs -i ' + file_egsinp + ' -p ' + file_pegs + ' ' + file_msh
-        job_file_name = 'mevegs_visualize_console_output_1.mvgs'
+        job_file_name = 'mevegs_job_thread_1.mvgs'
         with open(job_file_name, "w") as f:
-            process = subprocess.Popen(['cmd', '/c', command], stdout=f, stderr=subprocess.STDOUT, bufsize=0)
+            process = subprocess.Popen(['cmd', '/c', command], shell=True, stdout=f, stderr=subprocess.STDOUT, bufsize=0)
+        time.sleep(2)
+        utils.write_to_console_log(self, "MEVEGS:\t\tVisualization simulation started")
+        time.sleep(5)
+        self.btn_check_local_progress_clicked('visualize')
+        time.sleep(5)
 
-        self.topframe = ctk.CTkToplevel(self.gui)  # , fg_color="DarkSlateGray4"
-        self.topframe.after(500, self.topframe.grab_set())
-        self.topframe.geometry("500x200")
-        self.topframe.attributes('-topmost', True)
-        self.topframe.geometry("+0+0")
-        self.topframe.update()
-        self.topframe.focus()
-        self.topframe.title('Mevegs Job Progress - Visualize')
-        self.mevegs_progress_bar = ctk.CTkProgressBar(self.topframe)
-        self.mevegs_progress_bar.pack(pady=2, padx=10, side='top', fill='both', expand=True)
-        self.mevegs_progress_bar.set(self.bar_progress)
-        self.percent_label = ctk.CTkLabel(self.topframe, text='0%')
-        self.percent_label.pack(pady=2, padx=10, )
-        self.exit_button = ctk.CTkButton(master=self.topframe, text='Close on completion', command=self.btn_exit_popup)
-        self.exit_button.pack(pady=2, padx=10, side='top', fill='both', expand=True)
+    def show_ptracks_in_gmsh(self):
+        self.quit_progress_bar = False
+        self.mevegs_progress_bar.set(0)
+        self.percent_label.configure(text=str('No sim running'))
+        self.bar_progress = 0
+        self.frame_1.update_idletasks()
         self.gui.update_idletasks()
-        self.topframe.update()
-        time.sleep(3)
-        # Update progress of simulation
-        while self.bar_progress < 1:
-            total_progress = self.parse_progress_data(numjobs, total_progress, 'mevegs_visualize_console_output_')
-            self.bar_progress = self.return_progress(total_progress, numjobs)
-            time.sleep(.5)
-            if self.bar_progress > 11:
-                break
-        else:
-            utils.write_to_console_log(self, "MevEGS:\t\tSimulation Complete")
-
-        self.topframe.destroy()
+        _, file_egsinp = os.path.split(self.directory_file_egsinp)
+        _, file_msh = os.path.split(self.directory_file_msh)
+        _, file_pegs = os.path.split(self.directory_file_pegs)
         file_e = file_egsinp.split('.egsinp')[0]
         file_ptracks = str(file_e + '.ptracks')
         file_m = file_msh.split('.msh')[0]
         ptracks_output_file = str(file_e + '_' + file_m + '.ptracks.msh')
-        # Limit is a "Hard cutoff number of tracks (limit) beyond which no more tracks will be loaded and converted.
-        # Setting a cutoff can be useful when there are many tracks, and you wish to lower the memory load of viewing the output in gmsh."
-        # limit=10000  # This is an optional arg... may wish to make this a gui option
-        # units='mm'  # This is an optional arg... may wish to make this a gui option
+        # In process_ptracks, units='mm'  # This is an optional arg... may wish to make this a gui option
         pt.process_ptracks(file_ptracks, ptracks_output_file, limit=int(self.entry_nptracks.get()),
                            units='mm')  # Post_processing.py function added
         if os.path.isfile(self.directory_mevegs + ptracks_output_file):
@@ -1196,27 +1177,15 @@ class MevegsGui:
                                             text='Do you want to overwrite:\n' + ptracks_output_file +
                                                  '\n and associated visualization files in\n' + self.directory_project + '?')
                 self.warning.grid(column=0, row=0, pady=10, padx=10, columnspan=3, sticky='nsew')
-                self.yes_button = ctk.CTkButton(self.topframe, text='Yes, proceed',
-                                                command=lambda: [self.btn_exit_popup(),
-                                                                 self.copy_ptracks_visualization(file_ptracks,
-                                                                                                 ptracks_output_file),
-                                                                 self.gmsh_visuals()])
+                self.yes_button = ctk.CTkButton(self.topframe, text='Yes, proceed', command=lambda: [self.btn_exit_popup(), self.copy_ptracks_visualization(file_ptracks, ptracks_output_file), self.gmsh_visuals()])
                 self.yes_button.grid(column=0, row=1, pady=10, padx=10, sticky='nesw')
-                self.exit_button = ctk.CTkButton(master=self.topframe, text='No, cancel',
-                                                 command=lambda: [self.btn_exit_popup(),
-                                                                  self.cleanup_ptracks(file_ptracks,
-                                                                                       ptracks_output_file)])
+                self.exit_button = ctk.CTkButton(master=self.topframe, text='No, cancel', command=lambda: [self.btn_exit_popup(), self.cleanup_ptracks(file_ptracks, ptracks_output_file)])
                 self.exit_button.grid(column=1, row=1, pady=10, padx=10, sticky='nesw')
-                self.choose_button = ctk.CTkButton(master=self.topframe, text='No, make/choose\nnew project directory',
-                                                   command=lambda: [self.btn_exit_popup(),
-                                                                    self.set_project_directory_ptracks(file_ptracks,
-                                                                                                       ptracks_output_file)])
+                self.choose_button = ctk.CTkButton(master=self.topframe, text='No, make/choose\nnew project directory', command=lambda: [self.btn_exit_popup(), self.set_project_directory_ptracks(file_ptracks, ptracks_output_file)])
                 self.choose_button.grid(column=2, row=1, pady=10, padx=10, sticky='nesw')
             else:
                 self.copy_ptracks_visualization(file_ptracks, ptracks_output_file)
                 self.gmsh_visuals()
-        if os.path.isfile(self.directory_mevegs + str(self.menu_source_1.get())):
-            os.remove(self.directory_mevegs + str(self.menu_source_1.get()))
         os.chdir(self.directory_ini)
 
     def set_project_directory_ptracks(self, egsinp_ptracks_file, ptracks_output_file):
@@ -1244,8 +1213,21 @@ class MevegsGui:
         os.remove(self.directory_mevegs + ptracks_output_file.split('.ptracks.msh')[0] + '.msh.results.msh.egsinfo')
         os.remove(self.directory_mevegs + ptracks_output_file)
         os.remove(self.directory_mevegs + ptracks_output_file.split('.ptracks.msh')[0] + '.ptracks.msh.opt')
-        if os.path.isfile(self.directory_mevegs + str(self.menu_source_1.get())):
-            os.remove(self.directory_mevegs + str(self.menu_source_1.get()))
+        source_file = str()
+        with open(self.directory_file_egsinp, "r") as f:
+            for line in f:
+                if re.search('phase space file =', line):
+                    source_file = line.split('=')[1]
+        check_source_file = source_file.split('.')
+        if check_source_file[1] == 'txt':
+            source_file = '.'.join(source_file.split('.')[0:1])
+        elif check_source_file[1] == 'egsphsp1' and check_source_file[2] == 'txt':
+            source_file = '.'.join(source_file.split('.')[0:2])
+        elif check_source_file[1] == 'egsphsp1':
+            source_file = '.'.join(source_file.split('.')[0:1])
+        stripped_source_file = source_file.strip()
+        if os.path.isfile(self.directory_mevegs + stripped_source_file):
+            os.remove(self.directory_mevegs + stripped_source_file)
 
     def copy_ptracks_visualization(self, egsinp_ptracks_file, ptracks_output_file):
         os.makedirs(self.directory_project, exist_ok=True)
@@ -1255,8 +1237,8 @@ class MevegsGui:
         os.replace(self.directory_mevegs + ptracks_output_file, self.directory_project + ptracks_output_file)
         os.replace(self.directory_mevegs + ptracks_output_file.split('.ptracks.msh')[0] + '.ptracks.msh.opt',
                    self.directory_project + ptracks_output_file.split('.ptracks.msh')[0] + '.ptracks.msh.opt')
-        os.replace(self.directory_mevegs + 'mevegs_visualize_console_output_1.mvgs',
-                   self.directory_project + 'mevegs_visualize_console_output_1.mvgs')
+        os.replace(self.directory_mevegs + 'mevegs_job_thread_1.mvgs',
+                   self.directory_project + 'mevegs_job_thread_1.mvgs')
         _, file_egsinp = os.path.split(self.directory_file_egsinp)
         _, file_msh = os.path.split(self.directory_file_msh)
         file_e = file_egsinp.split('.egsinp')[0]
@@ -1264,6 +1246,22 @@ class MevegsGui:
         os.remove(self.directory_mevegs + file_msh)
         os.remove(self.directory_mevegs + ptracks_output_file.split('.ptracks.msh')[0] + '.msh.results.msh')
         os.remove(self.directory_mevegs + file_e + '.egsdat')
+        #     remove phasespace source
+        source_file = str()
+        with open(self.directory_file_egsinp, "r") as f:
+            for line in f:
+                if re.search('phase space file =', line):
+                    source_file = line.split('=')[1]
+        check_source_file = source_file.split('.')
+        if check_source_file[1] == 'txt':
+            source_file = '.'.join(source_file.split('.')[0:1])
+        elif check_source_file[1] == 'egsphsp1' and check_source_file[2] == 'txt':
+            source_file = '.'.join(source_file.split('.')[0:2])
+        elif check_source_file[1] == 'egsphsp1':
+            source_file = '.'.join(source_file.split('.')[0:1])
+        stripped_source_file = source_file.strip()
+        if os.path.isfile(self.directory_mevegs + stripped_source_file):
+            os.remove(self.directory_mevegs + stripped_source_file)
 
     def overwrite_defender_ptracks(self):
         self.topframe = ctk.CTkToplevel(self.gui)  # , fg_color="firebrick4"
@@ -1291,12 +1289,12 @@ class MevegsGui:
         _, file_egsinp = os.path.split(self.directory_file_egsinp)
         _, file_msh = os.path.split(self.directory_file_msh)
         default_filename = file_egsinp.split('.egsinp')[0] + '_' + file_msh.split('.msh')[0]
-        gmsh.initialize()
+        gmsh.initialize(['-noenv'])
         gmsh.open(self.directory_file_msh)
         gmsh.merge(self.directory_project + default_filename + '.ptracks.msh')
         gmsh.fltk.run()
         gmsh.finalize()
-        # gmsh takes focus from MevEGS gui and won't give it back until gmsh is closed
+        # gmsh takes focus from MEVEGS gui and won't give it back until gmsh is closed
 
     def overwrite_defender_mevegs(self):  # file_name here is .msh.results.msh
         _, file_egsinp = os.path.split(self.directory_file_egsinp)
@@ -1314,7 +1312,8 @@ class MevegsGui:
         self.topframe.grid_rowconfigure(0, weight=1)
         self.topframe.grid_rowconfigure(1, weight=1)
         self.warning = ctk.CTkLabel(self.topframe, font=("Arial", 20),
-                                    text='Do you want to overwrite your simulation:\n\n' +
+                                    text='There are similarly named project files in egs_home/mevegs.\n'
+                                         'Do you want to overwrite your simulation:\n\n' +
                                          msh_results_msh.split('.msh.results.msh')[
                                              0] + '\n\nin\n\n' + self.directory_mevegs + '?')
         self.warning.grid(column=0, row=0, pady=10, padx=10, columnspan=2, sticky='nsew')
@@ -1345,7 +1344,7 @@ class MevegsGui:
                                         0] + '\"\nis located in\n' + self.directory_project + '\n\n\nDo you want to?')
         self.warning.grid(column=0, row=0, pady=10, padx=10, columnspan=3, sticky='nsew')
         self.yes_button = ctk.CTkButton(self.topframe, text='Proceed,\nOverwrite',
-                                        command=lambda: [self.btn_exit_popup(), self.copy_mevegs_sumulation()])
+                                        command=lambda: [self.btn_exit_popup(), self.copy_mevegs_simulation()])
         self.yes_button.grid(column=0, row=1, pady=10, padx=10, sticky='nesw')
         self.rename_button = ctk.CTkButton(self.topframe, text='Choose/make new project directory,\nProceed',
                                            command=lambda: [self.btn_exit_popup(), self.set_project_directory_mevegs()])
@@ -1354,38 +1353,58 @@ class MevegsGui:
         self.exit_button.grid(column=2, row=1, pady=10, padx=10, sticky='nesw')
 
     def run_mevegs(self):
-        if os.path.isfile(self.directory_ini + 'Source_Phasespace_Files/' + str(self.menu_source_1.get())):
-            shutil.copy2(self.directory_ini + 'Source_Phasespace_Files/' + str(self.menu_source_1.get()),
-                         self.directory_mevegs)
-            utils.write_to_console_log(self, "MevEGS:\t\tPhase-space file included: " + str(self.menu_source_1.get()))
-            # print('Phase-space file included: ' + str(self.menu_source_1.get()))
         shutil.copy2(self.directory_file_msh, self.directory_mevegs)
         shutil.copy2(self.directory_file_egsinp, self.directory_mevegs)
+        # Below code reads egsinp to find 'phase space file'. This file then must be in the project directory with the egsinp so that it can be copied to the mevegs 'home'/cluster for simulation
+        source_file = str()
+        phase_space_file_check = str()
+        with open(self.directory_file_egsinp, "r") as f:
+            for line in f:
+                if re.search('phase space file', line):
+                    phase_space_file_check = line
+                    source_file = line.split('=')[1]
+                    stripped_source_file = source_file.strip()
+                    break
+        if phase_space_file_check and source_file == '':
+            utils.write_to_console_log(self,
+                                       'Either the phase space source file is not in the project directory,'
+                                       ' or the phase space file does not follow the convention: '
+                                       'phase space file = filename.egsphsp1.txt or filename.txt')
+        if stripped_source_file and phase_space_file_check:
+            if not os.path.isfile(self.directory_project + stripped_source_file):
+                utils.write_to_console_log(self,
+                                           'Phase space source requested in .egsinp file is not in project directory')
+        if os.path.isfile(self.directory_project + stripped_source_file):
+            shutil.copy2(self.directory_project + stripped_source_file, self.directory_mevegs)
+        elif not phase_space_file_check:
+            utils.write_to_console_log(self, 'No phase space source requested in .egsinp file')
+        time.sleep(3)  # to let things copy... big things
         _, file_egsinp = os.path.split(self.directory_file_egsinp)
         _, file_msh = os.path.split(self.directory_file_msh)
         _, file_pegs = os.path.split(self.directory_file_pegs)
-        utils.write_to_console_log(self, "MevEGS:\t\tPreparing files")
+        utils.write_to_console_log(self, "MEVEGS:\t\tFiles copied to MeVEGS \'HOME\' directory")
         numjobs = self.entry_njobs.get()
         os.chdir(self.directory_mevegs)
-        # if os.path.isfile(self.directory_mevegs + str(self.menu_source_1.get())):
-        #     print(self.directory_mevegs + str(self.menu_source_1.get()))
-        if os.path.isfile(self.directory_mevegs + str(self.menu_source_1.get())):
-            utils.write_to_console_log(self, "MevEGS:\t\t Phase-space source - " + str(self.menu_source_1.get()))
         for ijob in range(1, int(numjobs) + 1):
             command = 'mevegs -i ' + file_egsinp + ' -p ' + file_pegs + '  ' + file_msh + ' -b -P ' + str(
                 numjobs) + ' -j ' + str(ijob) + ' -f 1'
-            # command1 = 'echo %PATH%'
             job_file_name = 'mevegs_job_thread_' + str(ijob) + '.mvgs'
             with open(job_file_name, "w") as f:
-                process = subprocess.Popen(['cmd', '/c', command], stdout=f, stderr=subprocess.STDOUT, bufsize=0)
-        utils.write_to_console_log(self, "MevEGS:\t\tSimulation started")
+                process = subprocess.Popen(['cmd', '/c', command], shell=True, stdout=f, stderr=subprocess.STDOUT, bufsize=0)
+        time.sleep(2)
+        utils.write_to_console_log(self, "MEVEGS:\t\tSimulation started")
+        time.sleep(5)
+        self.btn_check_local_progress_clicked('simulation')
         os.chdir(self.directory_ini)
 
-    def btn_check_local_progress_clicked(self):
+    def btn_check_local_progress_clicked(self, sim_type):
         _, file_egsinp = os.path.split(self.directory_file_egsinp)
         _, file_msh = os.path.split(self.directory_file_msh)
         _, file_pegs = os.path.split(self.directory_file_pegs)
-        numjobs = self.entry_njobs.get()
+        if sim_type == 'visualize':
+            numjobs = 1
+        else:
+            numjobs = self.entry_njobs.get()
         total_progress = [0] * int(numjobs)
         # Update progress of simulation
         self.gui.update_idletasks()
@@ -1396,7 +1415,7 @@ class MevegsGui:
             if self.quit_progress_bar:
                 self.quit_progress_bar = False
                 self.mevegs_progress_bar.set(0)
-                self.percent_label.configure(text=str('0%'))
+                self.percent_label.configure(text=str('No sim running'))
                 self.bar_progress = 0
                 self.frame_1.update_idletasks()
                 self.gui.update_idletasks()
@@ -1404,7 +1423,7 @@ class MevegsGui:
             if os.path.isfile(self.directory_mevegs + 'mevegs_job_thread_1.mvgs'):
                 total_progress = self.parse_progress_data(numjobs, total_progress, 'mevegs_job_thread_')
                 self.bar_progress = self.return_progress(total_progress, numjobs)
-                time.sleep(.5)
+                time.sleep(1)
             else:
                 self.quit_progress_bar = False
                 self.mevegs_progress_bar.set(0)
@@ -1414,7 +1433,8 @@ class MevegsGui:
                 self.gui.update_idletasks()
                 break
         else:
-            utils.write_to_console_log(self, "MevEGS:\t\tSimulation Complete")
+            time.sleep(5)
+            utils.write_to_console_log(self, "MEVEGS:\t\tSimulation Complete")
 
     def return_progress(self, total_progress, numjobs):
         error = 99
@@ -1427,7 +1447,7 @@ class MevegsGui:
                 self.topframe.geometry("+0+0")
                 self.topframe.update()
                 self.topframe.focus()
-                self.topframe.title('MevEGS error')
+                self.topframe.title('MEVEGS error')
                 self.topframe.grid_columnconfigure(0, weight=1)
                 self.topframe.grid_columnconfigure(1, weight=1)
                 self.topframe.grid_rowconfigure(0, weight=1)
@@ -1476,13 +1496,13 @@ class MevegsGui:
                 total_progress[job_number] = 10
             elif '********** I\'m last job! **********\n' in status[-2]:
                 total_progress[job_number] = 10
-                utils.write_to_console_log(self, "MevEGS:\t\tLast job completed")
-            elif 'Quiting now.\n' in status[-1]:
+                utils.write_to_console_log(self, "MEVEGS:\t\tLast job completed, cleanup initiated")
+            elif 'Quitting now.\n' in status[-1]:
                 total_progress[job_number] = 99
-                utils.write_to_console_log(self, "MevEGS:\t\tError has occurred")
+                utils.write_to_console_log(self, "MEVEGS:\t\tError has occurred")
             elif 'operable program or batch file' in status[-1]:
                 total_progress[job_number] = 99
-                utils.write_to_console_log(self, "MevEGS:\t\tError has occurred")
+                utils.write_to_console_log(self, "MEVEGS:\t\tError has occurred")
             else:
                 cycles += 1
                 if cycles > 60:  # If job process files return something odd for 30 seconds then the bar will be set to 0
@@ -1504,34 +1524,52 @@ class MevegsGui:
         else:
             self.directory_project = directory_project + '/'
             self.btn_project_explore.configure(text=self.directory_project)
-            self.copy_mevegs_sumulation()
+            self.copy_mevegs_simulation()
 
-    def copy_mevegs_sumulation(self):
+    def copy_mevegs_simulation(self):
         os.chdir(self.directory_mevegs)
         os.makedirs(self.directory_project, exist_ok=True)
+        subfolders = [f.name for f in os.scandir(self.directory_project) if f.is_dir()]  # use f.path for full path of subdirs
+        # Get numbered projects (if any) and create next in sequence, or create a new numbered project
+        project_folders = []
+        for folder in subfolders:
+            if folder.split('_')[0] == 'project':
+                project_folders.append(folder)
+        if not project_folders:
+            directory_project = self.directory_project + 'project_1/'
+            os.makedirs(directory_project)
+        if project_folders:
+            numbered_folders = []
+            for folder in project_folders:
+                numbered_folders.append(folder.split('_')[1])
+            highest_number = max(numbered_folders)
+            new_folder_index = int(highest_number) + int(1)
+            directory_project = self.directory_project + 'project_' + str(new_folder_index) + '/'
+            os.makedirs(directory_project)
         _, file_egsinp = os.path.split(self.directory_file_egsinp)
         _, file_msh = os.path.split(self.directory_file_msh)
         results_msh = file_egsinp.split('.egsinp')[0] + '_' + file_msh.split('.msh')[0] + '.results.msh'
         if os.path.isfile(self.directory_mevegs + results_msh):
-            os.replace(self.directory_mevegs + results_msh, self.directory_project + results_msh)
+            os.replace(self.directory_mevegs + results_msh, directory_project + results_msh)
         if os.path.isfile(self.directory_mevegs + file_egsinp.split('.egsinp')[0] + '.egslog'):
             os.replace(self.directory_mevegs + file_egsinp.split('.egsinp')[0] + '.egslog',
-                       self.directory_project + file_egsinp.split('.egsinp')[0] + '_' + file_msh.split('.msh')[
+                       directory_project + file_egsinp.split('.egsinp')[0] + '_' + file_msh.split('.msh')[
                            0] + '.egslog')
         if os.path.isfile(self.directory_mevegs + file_egsinp):
-            os.replace(self.directory_mevegs + file_egsinp, self.directory_project + file_egsinp)
+            os.replace(self.directory_mevegs + file_egsinp, directory_project + file_egsinp)
         if os.path.isfile(self.directory_mevegs + file_msh):
-            os.replace(self.directory_mevegs + file_msh, self.directory_project + file_msh)
+            os.replace(self.directory_mevegs + file_msh, directory_project + file_msh)
         items_mevegs_job_logs = glob.glob(self.directory_mevegs + 'mevegs_job_thread_*.mvgs', recursive=False)
+        os.makedirs(directory_project + 'log_files/')
         for object_ in items_mevegs_job_logs:
             if os.path.isfile(object_):
-                shutil.copy2(object_, self.directory_project)
+                shutil.copy2(object_, directory_project + 'log_files/')
                 os.remove(object_)
         items_egsinfo = glob.glob(self.directory_mevegs + '/*.egsinfo', recursive=False)
         for object_ in items_egsinfo:
             if os.path.isfile(object_):
                 os.replace(object_,
-                           self.directory_project + file_egsinp.split('.egsinp')[0] + '_' + file_msh.split('.msh')[
+                           directory_project + file_egsinp.split('.egsinp')[0] + '_' + file_msh.split('.msh')[
                                0] + '.results.msh.egsinfo')
         items_egsrun = glob.glob(self.directory_mevegs + '/egsrun_*', recursive=False)
         for object_ in items_egsrun:
@@ -1543,23 +1581,34 @@ class MevegsGui:
         for object_ in items_egsdat:
             if os.path.isfile(object_):
                 os.remove(object_)  # junk files
-        if os.path.isfile(self.directory_mevegs + str(self.menu_source_1.get())):
-            os.remove(self.directory_mevegs + str(self.menu_source_1.get()))
         # Move phase space files
         items_phasespace = glob.glob(self.directory_mevegs + '/*.egsphsp1', recursive=False)
         if items_phasespace:
-            os.makedirs(self.directory_project + 'phase_space_files/', exist_ok=True)
+            os.makedirs(directory_project + 'phase_space_files/', exist_ok=True)
             for object_ in items_phasespace:
                 if os.path.isfile(object_):
-                    shutil.copy2(object_, self.directory_project + 'phase_space_files/')
+                    shutil.copy2(object_, directory_project + 'phase_space_files/')
                     os.remove(object_)
-        utils.write_to_console_log(self, 'MevEGS:\t\tFiles moved from MevEGS HOME to Project Directory\n'
-                                         '\t\t\t' + self.directory_project)
-        if os.path.isfile(self.directory_mevegs + str(self.menu_source_1.get())):
-            os.remove(str(self.menu_source_1.get()))
+
+        source_file = str()
+        with open(self.directory_file_egsinp, "r") as f:
+            for line in f:
+                if re.search('phase space file =', line):
+                    source_file = line.split('=')[1]
+        check_source_file = source_file.split('.')
+        if check_source_file[1] == 'txt':
+            source_file = '.'.join(source_file.split('.')[0:1])
+        elif check_source_file[1] == 'egsphsp1' and check_source_file[2] == 'txt':
+            source_file = '.'.join(source_file.split('.')[0:2])
+        elif check_source_file[1] == 'egsphsp1':
+            source_file = '.'.join(source_file.split('.')[0:1])
+        stripped_source_file = source_file.strip()
+        os.remove(self.directory_mevegs + stripped_source_file)
+        utils.write_to_console_log(self, 'MEVEGS:\t\tFiles moved from MEVEGS HOME to Project Directory\n'
+                                         '\t\t\t' + directory_project)
         # Process phase space files  //  only matches to parallel runs with at least 2 _w files
         phase_space = False
-        items_phase_space = glob.glob(self.directory_project + 'phase_space_files/' + '*_w[1-9]*egsphsp1',
+        items_phase_space = glob.glob(directory_project + 'phase_space_files/' + '*_w[1-9]*egsphsp1',
                                       recursive=False)
         for i in items_phase_space:
             if re.search('_w[1-9].egsphsp1', i):
@@ -1568,14 +1617,20 @@ class MevegsGui:
         if phase_space:
             utils.process_phase_space_files(self)
         # Update GUI with directory_file path for .results.msh file
-        self.directory_file_project_msh = self.directory_project + results_msh
-        self.btn_results_mesh_explore.configure(text='.'.join(os.path.basename(self.directory_file_project_msh).split('.')[:-2]))
-        self.directory_file_egsinp = self.directory_project + file_egsinp
-        self.btn_egsinp_explore.configure(text='.'.join(os.path.basename(self.directory_file_egsinp).split('.')[:-1]))
-        self.directory_file_msh = self.directory_project + file_msh
-        self.btn_mesh_explore.configure(text='.'.join(os.path.basename(self.directory_file_msh).split('.')[:-1]))
+        # self.directory_file_project_msh = self.directory_project + results_msh
+        # self.btn_results_mesh_explore.configure(text='.'.join(os.path.basename(self.directory_file_project_msh).split('.')[:-2]))
+        # self.directory_file_egsinp = self.directory_project + file_egsinp
+        # self.btn_egsinp_explore.configure(text='.'.join(os.path.basename(self.directory_file_egsinp).split('.')[:-1]))
+        # self.directory_file_msh = self.directory_project + file_msh
+        # self.btn_mesh_explore.configure(text='.'.join(os.path.basename(self.directory_file_msh).split('.')[:-1]))
+        # self.btn_project_explore.configure(self.directory_project)
+        #  UPDATE progress bar
+        self.mevegs_progress_bar.set(0)
+        self.percent_label.configure(text='No sim running')
+        self.bar_progress = 0
+        self.tab_1.update_idletasks()
         # QUICKSAVE
-        os.chdir(self.directory_project)
+        # os.chdir(self.directory_project)
         self.quick_save()
         utils.update_hover_tooltips(self)
         self.gui.update_idletasks()
@@ -1584,8 +1639,18 @@ class MevegsGui:
 
 if __name__ == "__main__":
     gui = ctk.CTk()
+    # gui.wm_iconbitmap()
+    # icopath = ImageTk.PhotoImage(file="\_internal\egg.ico")
+    # gui.iconphoto(False, icopath)
     gui_run = MevegsGui(gui)
     gui.attributes('-topmost', True)
     gui.update()
     gui.attributes('-topmost', False)
+    if getattr(sys, 'frozen', False):
+        pyi_splash.close()
     gui.mainloop()
+
+    # command = 'echo %PATH%'
+    # job_file_name = 'test_mainloop.txt'
+    # with open(job_file_name, "w") as f:
+    #     subprocess.Popen(['cmd', '/c', command], stdout=f, stderr=subprocess.STDOUT, bufsize=0)
