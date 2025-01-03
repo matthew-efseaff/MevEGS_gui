@@ -36,6 +36,29 @@ def btn_submit_cluster_jobs_clicked(self):
         if not os.path.isfile(self.directory_project + stripped_source_file):
             utils.write_to_console_log(self,
                                        'Phase space source requested in .egsinp file is not in project directory')
+    # host = str("ssh " + self.username + "@jericho-jobctrl.mevex.local test -f /electron-gamma-shower/egs_home/mevegs/"
+    #            + stripped_source_file)
+    # if subprocess.Popen(host):
+    #     self.topframe = ctk.CTkToplevel(self.gui)
+    #     self.topframe.grab_set()
+    #     self.topframe.geometry("700x300")
+    #     self.topframe.attributes('-topmost', True)
+    #     self.topframe.update()
+    #     self.topframe.focus()
+    #     self.topframe.title('Overwrite?')
+    #     self.topframe.grid_columnconfigure(0, weight=1)
+    #     self.topframe.grid_columnconfigure(1, weight=1)
+    #     self.topframe.grid_rowconfigure(0, weight=1)
+    #     self.topframe.grid_rowconfigure(1, weight=1)
+    #     self.warning = ctk.CTkLabel(self.topframe, font=("Arial", 20),
+    #                                 text='Phasespace source exists on the cluster. Would you like to overwrite it?')
+    #     self.warning.grid(column=0, row=0, pady=10, padx=10, columnspan=3, sticky='nsew')
+    #     self.yes_button = ctk.CTkButton(self.topframe, text='Yes, continue', command=lambda: [])
+    #     self.yes_button.grid(column=0, row=1, pady=10, padx=10, sticky='nesw')
+    #     self.exit_button = ctk.CTkButton(master=self.topframe, text='No, cancel',
+    #                                      command=lambda: [self.btn_exit_popup()])
+    #     self.exit_button.grid(column=1, row=1, pady=10, padx=10, sticky='nesw')
+
     if os.path.isfile(self.directory_project + stripped_source_file):
         shutil.copy2(self.directory_project + stripped_source_file, self.directory_ini)
     elif not phase_space_file_check:
@@ -51,8 +74,8 @@ def btn_submit_cluster_jobs_clicked(self):
     job_file_name = 'mevegs_cluster_console_output_1.mvgs'
     with open(job_file_name, "w") as f:
         process = subprocess.Popen(['cmd', '/c', command], stdout=f, stderr=subprocess.STDOUT, bufsize=0)
+    utils.write_to_console_log(self, 'MEVEGS:\t\tSending job to cluster')
     while process.poll() is None:
-        utils.write_to_console_log(self, 'MEVEGS:\t\tSending job to cluster')
         time.sleep(5)
     f_ = open(self.directory_ini + job_file_name, 'r')
     last_lines = f_.readlines()[-1]
@@ -130,9 +153,9 @@ def process_cluster_human_phase_space_files(self, phsp_filenames):
             progress_read.append(
                 subprocess.Popen(['cmd', '/c', command], stdout=f, stderr=subprocess.STDOUT, bufsize=0))
     for i in range(len(phsp_filenames)):
+        utils.write_to_console_log(self, "MEVEGS:\t\tPreparing human readable phase space files " + str(i + 1) + '...')
         while progress_read[i].poll() is None:
-            time.sleep(5)
-            utils.write_to_console_log(self, "MEVEGS:\t\tPreparing human readable phase space files " + str(i + 1) + '...')
+            time.sleep(1)
     utils.write_to_console_log(self, "MEVEGS:\t\tReadable particle phase space files saved in: " + self.directory_project + 'phase_space_files/')
     # delete beamdp.bat
     os.remove(self.directory_project + 'phase_space_files/beamdp.bat')
@@ -228,7 +251,6 @@ def btn_display_cluster_log_file_clicked_2(self, username):
             log = 'Cluster:\t\tThe ' + file_egsinp + ' job is not in progress. It may not have started or it may be complete'
     else:
         log = 'Cluster:\t\tChoose cluster username [File menu, Initial configuration wizard]'
-    # self.lbl_display_queue_2.configure(text=log)
     utils.write_to_console_log(self, log)
     utils.write_to_console_log(self, 'Cluster:\t\tProgress output from _w1.egslog file')
     # DELETE FILE

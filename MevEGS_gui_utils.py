@@ -42,7 +42,7 @@ def abort(*args, **kwargs):
 
 def write_to_console_log(self, _text):
     dt = datetime.datetime.now().replace(microsecond=0)
-    # self.console_text_box_source.insert("0.0", text='\n' + str(dt.time()) + ' - ' + _text + '\n')
+    self.console_text_box_source.insert("0.0", text='\n' + str(dt.time()) + ' - ' + _text + '\n')
     self.console_text_box_input.insert("0.0", text='\n' + str(dt.time()) + ' - ' + _text + '\n')
     self.console_text_box_1.insert("0.0", text='\n' + str(dt.time()) + ' - ' + _text + '\n')
     self.console_text_box_2.insert("0.0", text='\n' + str(dt.time()) + ' - ' + _text + '\n')
@@ -138,11 +138,11 @@ class MshResults_io:
         self.file = msh_file
         self.file_inp = os.path.basename(egsinp_file)  # .split('/')[-1]
         self.directory = project_directory
-        # self.console_text_box_source = console_text_box_list[0]
-        self.console_text_box_input = console_text_box_list[0]
-        self.console_text_box_1 = console_text_box_list[1]
-        self.console_text_box_2 = console_text_box_list[2]
-        self.console_text_box_3 = console_text_box_list[3]
+        self.console_text_box_source = console_text_box_list[0]
+        self.console_text_box_input = console_text_box_list[1]
+        self.console_text_box_1 = console_text_box_list[2]
+        self.console_text_box_2 = console_text_box_list[3]
+        self.console_text_box_3 = console_text_box_list[4]
         self.views_to_save = []
         self.groups_to_save = []
         if gmsh.isInitialized():
@@ -1042,7 +1042,7 @@ def check_btn_export_view(self, checkvar_views_list, checkvar_groups_list, volum
     else:
         gmsh.initialize(['-noenv'])
     msh_data = MshResults_io(self.directory_file_project_msh, self.directory_project, self.directory_file_egsinp,
-                             [self.console_text_box_input, self.console_text_box_1, self.console_text_box_2, self.console_text_box_3])  # self.console_text_box_source,
+                             [self.console_text_box_source, self.console_text_box_input, self.console_text_box_1, self.console_text_box_2, self.console_text_box_3])
     msh_data.load_model_information()
     groups = msh_data.get_physical_groups()
     views = msh_data.get_all_views()
@@ -1064,7 +1064,7 @@ def check_btn_export_group(self, checkvar_views_list, checkvar_groups_list, volu
     else:
         gmsh.initialize(['-noenv'])
     msh_data = MshResults_io(self.directory_file_project_msh, self.directory_project, self.directory_file_egsinp,
-                             [self.console_text_box_input, self.console_text_box_1, self.console_text_box_2, self.console_text_box_3])  # self.console_text_box_source,
+                             [self.console_text_box_source, self.console_text_box_input, self.console_text_box_1, self.console_text_box_2, self.console_text_box_3])
     msh_data.load_model_information()
     groups = msh_data.get_physical_groups()
     views = msh_data.get_all_views()
@@ -1081,13 +1081,26 @@ def check_btn_export_group(self, checkvar_views_list, checkvar_groups_list, volu
 
 
 def process_phase_space_files(self):
-    os.makedirs(self.directory_project + 'phase_space_files/', exist_ok=True)
-    directory_project = self.directory_project + 'phase_space_files/'
+    subfolders = [f.name for f in os.scandir(self.directory_project) if
+                  f.is_dir()]  # use f.path for full path of subdirs
+    # Get numbered projects (if any) and create next in sequence, or create a new numbered project
+    project_folders = []
+    for folder in subfolders:
+        if folder.split('_')[0] == 'project':
+            project_folders.append(folder)
+    if project_folders:
+        numbered_folders = []
+        for folder in project_folders:
+            numbered_folders.append(folder.split('_')[1])
+        highest_number = max(numbered_folders)
+        directory_project_1 = self.directory_project + 'project_' + str(highest_number) + '/'
+    else:
+        write_to_console_log(self, 'MEVEGS:\t\tProject can\'t be found to process phase space files')
+    directory_project = directory_project_1 + 'phase_space_files/'
     phsp_filenames = []
     for fname in os.listdir(directory_project):
         if '_w1.egsphsp1' in fname:
             phsp_filenames.append(os.path.basename(fname).split('_w1.egsphsp1')[0])
-
     items_phase_space = glob.glob(directory_project + '*_w[1-9].egsphsp1', recursive=False)
     items_phase_space_2 = glob.glob(directory_project + '*_w[1-9][0-9].egsphsp1', recursive=False)
     items_phase_space = items_phase_space + items_phase_space_2
@@ -1119,26 +1132,25 @@ def process_phase_space_files(self):
     else:
         write_to_console_log(self, "MEVEGS:\t\tCombining jobs complete")
     time.sleep(1)
-    process_human_phase_space_files(self, phsp_filenames)
+    process_human_phase_space_files(self, phsp_filenames, directory_project)
 
 
-def process_human_phase_space_files(self, phsp_filenames):
+def process_human_phase_space_files(self, phsp_filenames, directory_project):
     write_to_console_log(self, "MEVEGS:\t\tPreparing human readable phase space files...")
     # Convert to human-readable, hardcoded beamdp option 11
     # move beamdp.bat to working dir
-    directory_project = self.directory_project + 'phase_space_files/'
     shutil.copy2(self.directory_ini + 'beamdp.bat', directory_project)
     progress_read = []
     for j in range(len(phsp_filenames)):
         command = 'beamdp.bat ' + phsp_filenames[j] + '.egsphsp1'
         progress_read.append(subprocess.Popen(['cmd', '/c', command]))
-    time.sleep(5)
+    time.sleep(2)
     for i in range(len(phsp_filenames)):
+        write_to_console_log(self, "MEVEGS:\t\tPreparing human readable phase space files " + str(i + 1) + '...')
         while progress_read[i].poll() is None:
-            write_to_console_log(self, "MEVEGS:\t\tPreparing human readable phase space files " + str(i + 1) + '...')
-            time.sleep(10)
+            time.sleep(1)
     write_to_console_log(self, "MEVEGS:\t\tReadable particle phase space files saved in: " + directory_project)
-    # delete beamdp.bat
+    # delete beamdp.bat and more
     os.remove(directory_project + 'beamdp.bat')
     items_egsphsp1 = glob.glob(directory_project + '*_w[1-9].egsphsp1', recursive=False)  # _w[1-9].egsphsp1 files
     for object_ in items_egsphsp1:
@@ -1258,7 +1270,9 @@ def load_gmsh_data_for_figures(self, path_results_msh_file, path_directory_proje
         else:
             gmsh.initialize(['-noenv'])
         gmsh.logger.start()
-        msh_data = MshResults_io(path_results_msh_file, path_directory_project, path_egsinp_file, [self.console_text_box_input, self.console_text_box_1, self.console_text_box_2, self.console_text_box_3])  # self.console_text_box_source,
+        msh_data = MshResults_io(path_results_msh_file, path_directory_project, path_egsinp_file,
+                                 [self.console_text_box_source, self.console_text_box_input,
+                                  self.console_text_box_1, self.console_text_box_2, self.console_text_box_3])
         msh_data.load_model_information()
         view_tags = gmsh.view.getTags()
         view_names = msh_data.get_all_views()
@@ -1305,8 +1319,8 @@ def one_d_generation_gmsh(self):
     self.topframe.title('1D Coordinates - ' + checked_view)
     self.topframe.update()
     msh_data = MshResults_io(self.directory_file_project_msh, self.directory_project, self.directory_file_egsinp,
-                             [self.console_text_box_input, self.console_text_box_1,
-                                self.console_text_box_2, self.console_text_box_3])  # self.console_text_box_source,
+                             [self.console_text_box_source, self.console_text_box_input,
+                              self.console_text_box_1, self.console_text_box_2, self.console_text_box_3])
     msh_data.load_model_information()
     self.lbl_create_figs_tf = ctk.CTkLabel(self.topframe, text="Enter start- and end-points",
                                            font=('Helvetica', 16, 'bold'), justify='center')
@@ -1446,7 +1460,8 @@ def two_d_generation_gmsh(self):
     self.topframe.title('2D Coordinates - ' + checked_view)
     self.topframe.update()
     msh_data = MshResults_io(self.directory_file_project_msh, self.directory_project, self.directory_file_egsinp,
-                             [self.console_text_box_input, self.console_text_box_1, self.console_text_box_2, self.console_text_box_3])  # self.console_text_box_source,
+                             [self.console_text_box_source, self.console_text_box_input,
+                              self.console_text_box_1, self.console_text_box_2, self.console_text_box_3])
     msh_data.load_model_information()
     self.lbl_create_figs_tf = ctk.CTkLabel(self.topframe, text="P0: Origin", font=('Helvetica', 16, 'bold'),
                                            justify='center')
@@ -1789,7 +1804,7 @@ def create_hover_tooltips(self):
     self.drop_menu_relaunch_tip = CTkToolTip(self.menu_bar_relaunch, delay=0.1,
                                              message="Relaunches app after error (will quick-save inputs)")
     # CST source Tab
-    # self.btn_cst_file_explore_tip = CTkToolTip(self.btn_cst_file_explore, delay=0.1, message=self.directory_file_cst_source)
+    self.btn_cst_file_explore_tip = CTkToolTip(self.btn_cst_file_explore, delay=0.1, message=self.directory_file_cst_source)
     # Input Tab
     self.btn_project_explore_tip = CTkToolTip(self.btn_project_explore, delay=0.1, message=self.directory_project + '\n'
                                                                                             'One simulation per project folder\n'
@@ -1864,8 +1879,8 @@ def update_hover_tooltips(self):
     # Menu Bar
     self.drop_menu_relaunch_tip.configure(message="Relaunches app after error (will quick-save inputs)")
     # CST source Tab
-    # self.btn_cst_file_explore_tip = CTkToolTip(self.btn_cst_file_explore, delay=0.1,
-    #                                             message=self.directory_file_cst_source)
+    self.btn_cst_file_explore_tip = CTkToolTip(self.btn_cst_file_explore, delay=0.1,
+                                                message=self.directory_file_cst_source)
     # Input Tab
     self.btn_project_explore_tip.configure(message=self.directory_project + '\nOne simulation per project folder\n'
                                                                             'A main project folder can have many subfolders')
