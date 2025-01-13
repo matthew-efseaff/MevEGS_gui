@@ -405,7 +405,7 @@ class MevegsGui:
                                                            utils.return_running_jobs_to_null(self)])
         self.btn_clean_up.grid(column=1, row=1, padx=5, pady=2, rowspan=2, sticky='n')
 
-        self.btn_load_project = ctk.CTkButton(self.frame_1, text='Load recently\ncompleted project',
+        self.btn_load_project = ctk.CTkButton(self.frame_1, text='Load simulation\nresults',
                                               command=self.btn_project_explore_clicked)
         self.btn_load_project.grid(column=1, row=3, padx=5, pady=2, sticky='n')
 
@@ -601,7 +601,7 @@ class MevegsGui:
         self.menu_data, menu_data_path, menu_datas = self.data_list_populate()  # has to be initialized after check_config (for now)
         if self.directory_project != 'Choose Project Directory':
             utils.write_to_console_log(self, "MEVEGS:\t\tAuto loaded last workspace - " + self.directory_project)
-        utils.write_to_console_log(self, "MeVEGS:\t\tUI " + self.version)
+        utils.write_to_console_log(self, "MEVEGS:\t\tUI " + self.version)
 
     # Button/Event control
 
@@ -1360,6 +1360,7 @@ class MevegsGui:
         # Below code reads egsinp to find 'phase space file'. This file then must be in the project directory with the egsinp so that it can be copied to the mevegs 'home'/cluster for simulation
         source_file = str()
         phase_space_file_check = str()
+        stripped_source_file = str()
         with open(self.directory_file_egsinp, "r") as f:
             for line in f:
                 if re.search('phase space file', line):
@@ -1384,7 +1385,7 @@ class MevegsGui:
         _, file_egsinp = os.path.split(self.directory_file_egsinp)
         _, file_msh = os.path.split(self.directory_file_msh)
         _, file_pegs = os.path.split(self.directory_file_pegs)
-        utils.write_to_console_log(self, "MEVEGS:\t\tFiles copied to MeVEGS \'HOME\' directory")
+        utils.write_to_console_log(self, "MEVEGS:\t\tFiles copied to MEVEGS \'HOME\' directory")
         numjobs = self.entry_njobs.get()
         os.chdir(self.directory_mevegs)
         for ijob in range(1, int(numjobs) + 1):
@@ -1596,15 +1597,16 @@ class MevegsGui:
             for line in f:
                 if re.search('phase space file', line):
                     source_file = line.split('=')[1]
-        check_source_file = source_file.split('.')
-        if check_source_file[1] == 'txt':
-            source_file = '.'.join(source_file.split('.')[0:1])
-        elif check_source_file[1] == 'egsphsp1' and check_source_file[2] == 'txt':
-            source_file = '.'.join(source_file.split('.')[0:2])
-        elif check_source_file[1] == 'egsphsp1':
-            source_file = '.'.join(source_file.split('.')[0:1])
-        stripped_source_file = source_file.strip()
-        os.remove(self.directory_mevegs + stripped_source_file)
+        if source_file:
+            check_source_file = source_file.split('.')
+            if check_source_file[1] == 'txt':
+                source_file = '.'.join(source_file.split('.')[0:1])
+            elif check_source_file[1] == 'egsphsp1' and check_source_file[2] == 'txt':
+                source_file = '.'.join(source_file.split('.')[0:2])
+            elif check_source_file[1] == 'egsphsp1':
+                source_file = '.'.join(source_file.split('.')[0:1])
+            stripped_source_file = source_file.strip()
+            os.remove(self.directory_mevegs + stripped_source_file)
         # Move phase space files
         items_phasespace = glob.glob(self.directory_mevegs + '/*.egsphsp1', recursive=False)
         if items_phasespace:

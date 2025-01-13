@@ -1794,6 +1794,7 @@ def restore_defaults(self):
     self.btn_project_explore.configure(text=self.directory_project)
     self.job_number.set(self.njobs)
     self.btn_results_mesh_explore.configure(text=os.path.basename(self.directory_file_project_msh))
+    update_hover_tooltips(self)
     self.gui.title('MEVEGS - New Project')
     write_to_console_log(self, 'MEVEGS:\t\tNew project started')
     self.gui.update_idletasks()
