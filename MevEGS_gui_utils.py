@@ -42,7 +42,6 @@ def abort(*args, **kwargs):
 
 def write_to_console_log(self, _text):
     dt = datetime.datetime.now().replace(microsecond=0)
-    self.console_text_box_source.insert("0.0", text='\n' + str(dt.time()) + ' - ' + _text + '\n')
     self.console_text_box_input.insert("0.0", text='\n' + str(dt.time()) + ' - ' + _text + '\n')
     self.console_text_box_1.insert("0.0", text='\n' + str(dt.time()) + ' - ' + _text + '\n')
     self.console_text_box_2.insert("0.0", text='\n' + str(dt.time()) + ' - ' + _text + '\n')
@@ -138,11 +137,10 @@ class MshResults_io:
         self.file = msh_file
         self.file_inp = os.path.basename(egsinp_file)  # .split('/')[-1]
         self.directory = project_directory
-        self.console_text_box_source = console_text_box_list[0]
-        self.console_text_box_input = console_text_box_list[1]
-        self.console_text_box_1 = console_text_box_list[2]
-        self.console_text_box_2 = console_text_box_list[3]
-        self.console_text_box_3 = console_text_box_list[4]
+        self.console_text_box_input = console_text_box_list[0]
+        self.console_text_box_1 = console_text_box_list[1]
+        self.console_text_box_2 = console_text_box_list[2]
+        self.console_text_box_3 = console_text_box_list[3]
         self.views_to_save = []
         self.groups_to_save = []
         if gmsh.isInitialized():
@@ -1042,7 +1040,7 @@ def check_btn_export_view(self, checkvar_views_list, checkvar_groups_list, volum
     else:
         gmsh.initialize(['-noenv'])
     msh_data = MshResults_io(self.directory_file_project_msh, self.directory_project, self.directory_file_egsinp,
-                             [self.console_text_box_source, self.console_text_box_input, self.console_text_box_1, self.console_text_box_2, self.console_text_box_3])
+                             [self.console_text_box_input, self.console_text_box_1, self.console_text_box_2, self.console_text_box_3])
     msh_data.load_model_information()
     groups = msh_data.get_physical_groups()
     views = msh_data.get_all_views()
@@ -1064,7 +1062,7 @@ def check_btn_export_group(self, checkvar_views_list, checkvar_groups_list, volu
     else:
         gmsh.initialize(['-noenv'])
     msh_data = MshResults_io(self.directory_file_project_msh, self.directory_project, self.directory_file_egsinp,
-                             [self.console_text_box_source, self.console_text_box_input, self.console_text_box_1, self.console_text_box_2, self.console_text_box_3])
+                             [self.console_text_box_input, self.console_text_box_1, self.console_text_box_2, self.console_text_box_3])
     msh_data.load_model_information()
     groups = msh_data.get_physical_groups()
     views = msh_data.get_all_views()
@@ -1271,7 +1269,7 @@ def load_gmsh_data_for_figures(self, path_results_msh_file, path_directory_proje
             gmsh.initialize(['-noenv'])
         gmsh.logger.start()
         msh_data = MshResults_io(path_results_msh_file, path_directory_project, path_egsinp_file,
-                                 [self.console_text_box_source, self.console_text_box_input,
+                                 [self.console_text_box_input,
                                   self.console_text_box_1, self.console_text_box_2, self.console_text_box_3])
         msh_data.load_model_information()
         view_tags = gmsh.view.getTags()
@@ -1319,7 +1317,7 @@ def one_d_generation_gmsh(self):
     self.topframe.title('1D Coordinates - ' + checked_view)
     self.topframe.update()
     msh_data = MshResults_io(self.directory_file_project_msh, self.directory_project, self.directory_file_egsinp,
-                             [self.console_text_box_source, self.console_text_box_input,
+                             [self.console_text_box_input,
                               self.console_text_box_1, self.console_text_box_2, self.console_text_box_3])
     msh_data.load_model_information()
     self.lbl_create_figs_tf = ctk.CTkLabel(self.topframe, text="Enter start- and end-points",
@@ -1460,7 +1458,7 @@ def two_d_generation_gmsh(self):
     self.topframe.title('2D Coordinates - ' + checked_view)
     self.topframe.update()
     msh_data = MshResults_io(self.directory_file_project_msh, self.directory_project, self.directory_file_egsinp,
-                             [self.console_text_box_source, self.console_text_box_input,
+                             [self.console_text_box_input,
                               self.console_text_box_1, self.console_text_box_2, self.console_text_box_3])
     msh_data.load_model_information()
     self.lbl_create_figs_tf = ctk.CTkLabel(self.topframe, text="P0: Origin", font=('Helvetica', 16, 'bold'),
@@ -1804,8 +1802,6 @@ def create_hover_tooltips(self):
     # Menu Bar
     self.drop_menu_relaunch_tip = CTkToolTip(self.menu_bar_relaunch, delay=0.1,
                                              message="Relaunches app after error (will quick-save inputs)")
-    # CST source Tab
-    self.btn_cst_file_explore_tip = CTkToolTip(self.btn_cst_file_explore, delay=0.1, message=self.directory_file_cst_source)
     # Input Tab
     self.btn_project_explore_tip = CTkToolTip(self.btn_project_explore, delay=0.1, message=self.directory_project + '\n'
                                                                                             'One simulation per project folder\n'
@@ -1879,9 +1875,6 @@ def create_hover_tooltips(self):
 def update_hover_tooltips(self):
     # Menu Bar
     self.drop_menu_relaunch_tip.configure(message="Relaunches app after error (will quick-save inputs)")
-    # CST source Tab
-    self.btn_cst_file_explore_tip = CTkToolTip(self.btn_cst_file_explore, delay=0.1,
-                                                message=self.directory_file_cst_source)
     # Input Tab
     self.btn_project_explore_tip.configure(message=self.directory_project + '\nOne simulation per project folder\n'
                                                                             'A main project folder can have many subfolders')

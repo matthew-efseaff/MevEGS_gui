@@ -36,28 +36,6 @@ def btn_submit_cluster_jobs_clicked(self):
         if not os.path.isfile(self.directory_project + stripped_source_file):
             utils.write_to_console_log(self,
                                        'Phase space source requested in .egsinp file is not in project directory')
-    # host = str("ssh " + self.username + "@jericho-jobctrl.mevex.local test -f /electron-gamma-shower/egs_home/mevegs/"
-    #            + stripped_source_file)
-    # if subprocess.Popen(host):
-    #     self.topframe = ctk.CTkToplevel(self.gui)
-    #     self.topframe.grab_set()
-    #     self.topframe.geometry("700x300")
-    #     self.topframe.attributes('-topmost', True)
-    #     self.topframe.update()
-    #     self.topframe.focus()
-    #     self.topframe.title('Overwrite?')
-    #     self.topframe.grid_columnconfigure(0, weight=1)
-    #     self.topframe.grid_columnconfigure(1, weight=1)
-    #     self.topframe.grid_rowconfigure(0, weight=1)
-    #     self.topframe.grid_rowconfigure(1, weight=1)
-    #     self.warning = ctk.CTkLabel(self.topframe, font=("Arial", 20),
-    #                                 text='Phasespace source exists on the cluster. Would you like to overwrite it?')
-    #     self.warning.grid(column=0, row=0, pady=10, padx=10, columnspan=3, sticky='nsew')
-    #     self.yes_button = ctk.CTkButton(self.topframe, text='Yes, continue', command=lambda: [])
-    #     self.yes_button.grid(column=0, row=1, pady=10, padx=10, sticky='nesw')
-    #     self.exit_button = ctk.CTkButton(master=self.topframe, text='No, cancel',
-    #                                      command=lambda: [self.btn_exit_popup()])
-    #     self.exit_button.grid(column=1, row=1, pady=10, padx=10, sticky='nesw')
 
     if os.path.isfile(self.directory_project + stripped_source_file):
         shutil.copy2(self.directory_project + stripped_source_file, self.directory_ini)
