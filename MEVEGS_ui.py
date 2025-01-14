@@ -1200,10 +1200,10 @@ class MevegsGui:
         os.remove(self.directory_mevegs + ptracks_output_file.split('.ptracks.msh')[0] + '.msh.results.msh')
         os.remove(self.directory_mevegs + file_e + '.egsdat')
         #     remove phasespace source
-        source_file = str()
+        source_file = str('first.last')
         with open(self.directory_file_egsinp, "r") as f:
             for line in f:
-                if re.search('phase space file =', line):
+                if re.search('phase space file', line):
                     source_file = line.split('=')[1]
         check_source_file = source_file.split('.')
         if check_source_file[1] == 'txt':
