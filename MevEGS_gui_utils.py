@@ -884,6 +884,11 @@ def btn_choose_export_data_clicked(self):
         self.entry_milliamps = ctk.CTkEntry(self.topframe, width=200, textvariable=avg_beam_current, justify='center')
         self.entry_milliamps.grid(column=1, row=views_rows + 2, pady=(0, 10), padx=10, sticky='w')
         avg_beam_current.set('1')
+    else:
+        avg_beam_current = ctk.StringVar()
+        self.lbl_milliamps = ctk.CTkLabel(self.topframe, text='Avg Beam\nCurrent (mA)')
+        self.entry_milliamps = ctk.CTkEntry(self.topframe, width=200, textvariable=avg_beam_current, justify='center')
+        avg_beam_current.set('1')
     self.lbl_lengths = ctk.CTkLabel(self.topframe, text='Length units')
     self.lbl_lengths.grid(column=0, row=views_rows + 3, pady=(0, 10), padx=10, sticky='e')
     self.btn_lengths = ctk.CTkSegmentedButton(self.topframe, width=200, values=['mm', 'cm', 'm'],
@@ -1808,7 +1813,6 @@ def create_hover_tooltips(self):
                                                                                             'A main project folder can have many subfolders')
     self.btn_project_explore_new_tip = CTkToolTip(self.btn_project_explore_new, delay=0.1, message='Resets project and input files')
     self.btn_egsinp_explore_tip = CTkToolTip(self.btn_egsinp_explore, delay=0.1, message=self.directory_file_egsinp)
-    self.btn_egsinp_build_tip = CTkToolTip(self.btn_egsinp_build, delay=0.1, message='Under development')
     self.btn_mesh_explore_tip = CTkToolTip(self.btn_mesh_explore, delay=0.1, message=self.directory_file_msh)
     self.btn_results_mesh_explore_tip = CTkToolTip(self.btn_results_mesh_explore, delay=0.1,
                                                    message=self.directory_file_project_msh)
@@ -1880,7 +1884,6 @@ def update_hover_tooltips(self):
                                                                             'A main project folder can have many subfolders')
     self.btn_project_explore_new_tip.configure(message='Resets project and input files')
     self.btn_egsinp_explore_tip.configure(message=self.directory_file_egsinp)
-    self.btn_egsinp_build_tip.configure(message='Under development')
     self.btn_mesh_explore_tip.configure(message=self.directory_file_msh)
     self.btn_results_mesh_explore_tip.configure(message=self.directory_file_project_msh)
     # self.btn_mevegs_explore_tip.configure(message=self.directory_mevegs)
